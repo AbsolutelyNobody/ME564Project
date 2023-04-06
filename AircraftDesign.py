@@ -39,7 +39,7 @@ class Aircraft:
 		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
 
 		#Wing Loading
-		self.wing_loading = 0.5*self.ground_air_density*self.stall_velocity**2 * self.wing_lift_coef
+		self.wing_loading = 0.5*self.ground_air_density*self.stall_velocity**2 * self.airfoil.max_cl
 
 		# Sec 8.4.3
 		self.wing_lift_coef = 0.9*self.airfoil.max_cl #0.9 from pg 409 as flap deflection @ 45 deg
