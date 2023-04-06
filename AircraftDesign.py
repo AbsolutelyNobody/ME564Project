@@ -25,7 +25,6 @@ class Aircraft:
 		self.wetted_area = 1
 		self.gravity = 32.2 #in lbf
 		self.ground_air_density = 0.0765 #lb/ft^3
-		self.airfoil_lift_coef = 1 # not sure how to get this yet
 		self.thrust_weight = 1
 
 
@@ -42,7 +41,7 @@ class Aircraft:
 
 		# Sec 8.4.3
 		self.wing_loading = self.wetted_area / self.planform_area
-		self.wing_lift_coef = 0.9*self.airfoil_lift_coef #0.9 from pg 409 as flap deflection @ 45 deg
+		self.wing_lift_coef = 0.9*self.airfoil.max_cl #0.9 from pg 409 as flap deflection @ 45 deg
 		self.ground_roll = (1.21*(self.wing_loading) / (self.gravity * self.ground_air_density * self.wing_lift_coef *self.thrust_weight))
 
 
