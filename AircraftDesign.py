@@ -21,11 +21,11 @@ class Aircraft:
 		self.LD_ratio = 14 # this will need to increase
 		# look at page 406, there is reference to a calculation by Raymer
 		self.airframe_fraction = 0.05 # this number is too small, was made this size to make solution exist
-		self.planform_area = 1
-		self.wetted_area = 1
-		self.gravity = 32.2 #in lbf
+		self.gravity = 32.2 #i	n lbf
 		self.ground_air_density = 0.0765 #lb/ft^3
+		self.airfoil_lift_coef = 1 # not sure how to get this yet
 		self.thrust_weight = 1
+		self.stall_velocity = 1
 
 
 		cruise_ratio = 1/exp(self.fuel_consumption/self.prop_efficiency*self.flight.range/self.LD_ratio) # Eq 8.15
@@ -39,10 +39,13 @@ class Aircraft:
 
 		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
 
+		#Wing Loading
+		self.wing_loading = 0.5*self.ground_air_density*self.stall_velocity^2 * self.wing_lift_coef
+
 		# Sec 8.4.3
-		self.wing_loading = self.wetted_area / self.planform_area
-		self.wing_lift_coef = 0.9*self.airfoil.max_cl #0.9 from pg 409 as flap deflection @ 45 deg
+		self.wing_lift_coef = 0.9*self.airfoil_lift_coef #0.9 from pg 409 as flap deflection @ 45 deg
 		self.ground_roll = (1.21*(self.wing_loading) / (self.gravity * self.ground_air_density * self.wing_lift_coef *self.thrust_weight))
+
 
 
 class Flight:
