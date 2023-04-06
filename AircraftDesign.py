@@ -25,7 +25,8 @@ class Aircraft:
 		self.wetted_area = 1
 		self.gravity = 32.2 #in lbf
 		self.ground_air_density = 0.0765 #lb/ft^3
-		self.aifoil_lift_coef = 1 # not sure how to get this yet
+		self.airfoil_lift_coef = 1 # not sure how to get this yet
+		self.thrust_weight = 1
 
 
 		cruise_ratio = 1/exp(self.fuel_consumption/self.prop_efficiency*self.flight.range/self.LD_ratio) # Eq 8.15
