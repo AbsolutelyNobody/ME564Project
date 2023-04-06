@@ -8,6 +8,7 @@ MILES_TO_FEET = 5280
 KG_TO_LBS = 2.2
 GRAVITY = 32.2 #lbf
 AIR_DENSITY_GROUND = 0.002377 #slug/ft^3
+AIR_DENSITY_CRUISE = 0.0012673 # slug/ft^3 at 20000 feet? Idk why they immediately assumed this
 SECONDS_PER_HOUR = 60*60
 FT_LBS_PER_S_PER_HP = 550
 
@@ -47,7 +48,9 @@ class Aircraft:
 		print(f"Initial weight estimate: {self.weight} lbs")
 
 		# Sec 8.4.2
-		self.wing_loading = self.determine_wing_loading()
+		self.wing_loading_max = self.determine_wing_loading()
+
+		self.S = self.weight / self.wing_loading_max
 
 		# Sec 8.4.3
 		self.PWR, self.AR = self.determine_TWR_AR()
@@ -60,20 +63,32 @@ class Aircraft:
 		print(f"Power Required for Takeoff: {takeoff_power/FT_LBS_PER_S_PER_HP} hp")
 		AR, climb_power = self.get_power_required_climb_and_AR()
 		print(f"Power Required for Climb: {climb_power/FT_LBS_PER_S_PER_HP} hp")
-		return np.max([takeoff_power, climb_power]), AR
+		v_max_power = self.get_power_required_v_max()
+		print(f"Power Required for VMax: {v_max_power/FT_LBS_PER_S_PER_HP} hp")
+
+		max_power = np.max([takeoff_power, climb_power, v_max_power])
+		print(f"Maximum of Power Req: {max_power/FT_LBS_PER_S_PER_HP} hp")
+		return max_power, AR
+
+	def get_power_required_v_max(self):
+		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
+		W_2 = self.weight * self.weight_ratios[0]* self.weight_ratios[1]
+		W_mc = 0.5*W_2*(1+self.weight_ratios[2])
+		T = W_mc * (0.5*AIR_DENSITY_CRUISE*self.flight.v_max**2*self.airfoil.Cdo/(W_mc/self.S)+2*K*W_mc/(AIR_DENSITY_CRUISE*self.flight.v_max**2*self.S))
+		P = T*self.flight.v_max/self.prop_efficiency
+		return P
 
 	def get_power_required_climb_and_AR(self):
-		Cdo = 4 * 0.0043 # TODO: I don't think this is right
-		K = 1/(4*Cdo*self.LD_ratio**2)
-		e = 0.6 # TODO: this is from nowehere, should come from somewhere
-		AR = 1/(np.pi*e*K)
-		P = self.weight/self.prop_efficiency * (self.flight.rc_max+np.sqrt(2/AIR_DENSITY_GROUND*np.sqrt(K/(3*Cdo))*self.wing_loading)*1.155/self.LD_ratio)
+		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
+		AR = 1/(np.pi*self.airfoil.e*K)
+		P = self.weight/self.prop_efficiency * (self.flight.rc_max+np.sqrt(2/AIR_DENSITY_GROUND*np.sqrt(K/(3*self.airfoil.Cdo))*self.wing_loading_max)*1.155/self.LD_ratio)
 		return AR, P
+
 	def get_power_required_takeoff(self):
 		# This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
-		s_g_times_TWR = (1.21*(self.wing_loading) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
+		s_g_times_TWR = (1.21*(self.wing_loading_max) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
 
-		v_stall_takeoff = np.sqrt(2*self.wing_loading/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
+		v_stall_takeoff = np.sqrt(2*self.wing_loading_max/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
 		R = 6.96 * v_stall_takeoff ** 2 / GRAVITY
 		take_off_angle = np.arccos(1-(self.flight.obstacle_height/R)) # Eq 6.99
 		s_a = R * np.sin(take_off_angle) # Eq 8.35
@@ -114,6 +129,7 @@ class Flight:
 		# are chairs part of airframe, or are chairs in this weight
 		self.weight_stuff = self.crew * (CREW_MEMBER_WEIGHT + CREW_PAYLOAD_WEIGHT) * KG_TO_LBS
 		self.safety = safety
+		self.v_max = 200 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR
 		self.v_stall = stall
 		self.v_flare = self.v_stall * 1.23
 		self.landing_distance = 2200 # ft, maybe move out the magic number
@@ -132,6 +148,10 @@ class Airfoil:
 
 		self.max_cl_half_flaps = 0.5 + self.max_cl
 		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
+
+		self.e = 0.6 # TODO: I don't think this is right
+		self.Cdo = 4 * 0.0043 # TODO: I don't think this is right
+
 
 	def get_max_cl(self):
 		max_cl = 0
