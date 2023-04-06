@@ -23,7 +23,6 @@ class Aircraft:
 		self.airframe_fraction = 0.05 # this number is too small, was made this size to make solution exist
 		self.gravity = 32.2 #i	n lbf
 		self.ground_air_density = 0.0765 #lb/ft^3
-		self.airfoil_lift_coef = 1 # not sure how to get this yet
 		self.thrust_weight = 1
 		self.stall_velocity = 1
 
@@ -40,10 +39,10 @@ class Aircraft:
 		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
 
 		#Wing Loading
-		self.wing_loading = 0.5*self.ground_air_density*self.stall_velocity^2 * self.wing_lift_coef
+		self.wing_loading = 0.5*self.ground_air_density*self.stall_velocity**2 * self.wing_lift_coef
 
 		# Sec 8.4.3
-		self.wing_lift_coef = 0.9*self.airfoil_lift_coef #0.9 from pg 409 as flap deflection @ 45 deg
+		self.wing_lift_coef = 0.9*self.airfoil.max_cl #0.9 from pg 409 as flap deflection @ 45 deg
 		self.ground_roll = (1.21*(self.wing_loading) / (self.gravity * self.ground_air_density * self.wing_lift_coef *self.thrust_weight))
 
 
