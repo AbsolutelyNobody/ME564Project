@@ -8,6 +8,8 @@ MILES_TO_FEET = 5280
 KG_TO_LBS = 2.2
 GRAVITY = 32.2 #lbf
 AIR_DENSITY_GROUND = 0.002377 #slug/ft^3
+SECONDS_PER_HOUR = 60*60
+FT_LBS_PER_S_PER_HP = 550
 
 # Things that the textbook declares to be true
 j = 1.15
@@ -48,22 +50,59 @@ class Aircraft:
 		self.wing_loading = self.determine_wing_loading()
 
 		# Sec 8.4.3
+		self.PWR, self.AR = self.determine_TWR_AR()
 
-		self.wing_lift_coef = 0.9*self.airfoil.max_cl #0.9 from pg 409 as flap deflection @ 45 deg
-		self.ground_roll = (1.21*(self.wing_loading) / (GRAVITY * AIR_DENSITY_GROUND * self.wing_lift_coef *self.thrust_weight))
+		print(f"Aspect Ratio: {self.AR}")
+
+
+	def determine_TWR_AR(self):
+		takeoff_power = self.get_power_required_takeoff()
+		print(f"Power Required for Takeoff: {takeoff_power/FT_LBS_PER_S_PER_HP} hp")
+		AR, climb_power = self.get_power_required_climb_and_AR()
+		print(f"Power Required for Climb: {climb_power/FT_LBS_PER_S_PER_HP} hp")
+		return np.max([takeoff_power, climb_power]), AR
+
+	def get_power_required_climb_and_AR(self):
+		Cdo = 4 * 0.0043 # TODO: I don't think this is right
+		K = 1/(4*Cdo*self.LD_ratio**2)
+		e = 0.6 # TODO: this is from nowehere, should come from somewhere
+		AR = 1/(np.pi*e*K)
+		P = self.weight/self.prop_efficiency * (self.flight.rc_max+np.sqrt(2/AIR_DENSITY_GROUND*np.sqrt(K/(3*Cdo))*self.wing_loading)*1.155/self.LD_ratio)
+		return AR, P
+	def get_power_required_takeoff(self):
+		# This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
+		s_g_times_TWR = (1.21*(self.wing_loading) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
+
+		v_stall_takeoff = np.sqrt(2*self.wing_loading/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
+		R = 6.96 * v_stall_takeoff ** 2 / GRAVITY
+		take_off_angle = np.arccos(1-(self.flight.obstacle_height/R)) # Eq 6.99
+		s_a = R * np.sin(take_off_angle) # Eq 8.35
+
+		TWR_at_seventy_percent_LO = s_g_times_TWR/(self.flight.takeoff_distance-s_a) # Eq 8.36
+
+		# Eq 8.37
+		V = 0.7 * 1.1 * v_stall_takeoff
+		T = TWR_at_seventy_percent_LO * self.weight
+		P_required = T * V
+
+		minimum_P = P_required / self.prop_efficiency # Eq 8.38
+
+		return minimum_P
+
 
 	def determine_wing_loading(self):
 		#Wing Loading 8.4.2
 
-		wing_loading_stall = 0.5*AIR_DENSITY_GROUND*self.flight.v_stall**2 * self.airfoil.max_cL_flaps # Eq 8.27
+		wing_loading_stall = 0.5*AIR_DENSITY_GROUND*self.flight.v_stall**2 * self.airfoil.max_cL_full_flaps # Eq 8.27
 		# setting  up coefficients for quadratic formula
-		a = j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_flaps * mu)
-		b = j * N * np.sqrt(2 / (AIR_DENSITY_GROUND*self.airfoil.max_cL_flaps))
+		a = j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu)
+		b = j * N * np.sqrt(2 / (AIR_DENSITY_GROUND*self.airfoil.max_cL_full_flaps))
 		c = - self.flight.landing_distance
+		print(a,b,c)
 		wing_loading_land  = ((-b + np.sqrt(b**2 - 4 * a * c))/(2*a))**2 # solving 8.29
 		print(f"Found restrictions on wing load: {wing_loading_stall} (stall condition), {wing_loading_land} (landing_conditions)")
 		driving_wing_loading = np.min([wing_loading_land, wing_loading_stall])
-		print(f"Minimum wing load condition: {driving_wing_loading}")
+		print(f"Minimum W/S: {driving_wing_loading}")
 		return driving_wing_loading
 
 
@@ -79,6 +118,8 @@ class Flight:
 		self.v_flare = self.v_stall * 1.23
 		self.landing_distance = 2200 # ft, maybe move out the magic number
 		self.takeoff_distance = 2200 # ft, maybe move out the magic number
+		self.obstacle_height = 50 # ft
+		self.rc_max = 15 #ft/s
 
 
 class Airfoil:
@@ -86,8 +127,11 @@ class Airfoil:
 		self.airfoil_data = np.genfromtxt(filepath, delimiter=',')
 		self.max_cl = self.get_max_cl()
 		# using only l/L to distinguish seems bad, but they do it
-		self.max_cl_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
-		self.max_cL_flaps = 0.9 * self.max_cl_flaps # Eq 8.24
+		self.max_cl_full_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
+		self.max_cL_full_flaps = 0.9 * self.max_cl_full_flaps # Eq 8.24
+
+		self.max_cl_half_flaps = 0.5 + self.max_cl
+		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
 
 	def get_max_cl(self):
 		max_cl = 0
@@ -103,7 +147,7 @@ def main():
 	CREW = 2 # people
 	FLIGHT_TIME = 10 # days
 	SAFETY_FACTOR = 1.01
-	V_STALL = 120 * KM_TO_MILES * MILES_TO_FEET # this is already pretty high, but we can mess with it
+	V_STALL = 120 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
 
 	# this just stores the goal, vs details of aircraft
 	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
