@@ -29,7 +29,7 @@ class Aircraft:
 		self.airfoil = airfoil
 		self.fuel_consumption = 2.02*10**(-7)
 		self.prop_efficiency = 0.85
-		self.LD_ratio = 14 # this will need to increase
+		self.LD_ratio = 14 # TODO: this will come from airfoild
 		# look at page 406, there is reference to a calculation by Raymer
 		self.airframe_fraction = 0.05 # this number is too small, was made this size to make solution exist
 		self.thrust_weight = 1
@@ -53,7 +53,7 @@ class Aircraft:
 		self.S = self.weight / self.wing_loading_max
 
 		# Sec 8.4.3
-		self.PWR, self.AR = self.determine_TWR_AR()
+		self.P, self.AR = self.determine_TWR_AR()
 
 		print(f"Aspect Ratio: {self.AR}")
 
@@ -85,7 +85,7 @@ class Aircraft:
 		return AR, P
 
 	def get_power_required_takeoff(self):
-		# This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
+		# TODO: This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
 		s_g_times_TWR = (1.21*(self.wing_loading_max) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
 
 		v_stall_takeoff = np.sqrt(2*self.wing_loading_max/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
