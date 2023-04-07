@@ -15,7 +15,8 @@ FT_LBS_PER_S_PER_HP = 550
 # Things that the textbook declares to be true
 j = 1.15
 N = 3
-mu = 0.4
+mu_brakes = 0.4
+mu_no_brakes = 0.04
 
 # Non-technical constants
 CREW_MEMBER_WEIGHT = 70 # kg
@@ -29,7 +30,7 @@ class Aircraft:
 		self.airfoil = airfoil
 		self.fuel_consumption = 2.02*10**(-7)
 		self.prop_efficiency = 0.85
-		self.LD_ratio = 27 # TODO: this will come from airfoild
+		self.LD_ratio = 26 # TODO: this will come from airfoild
 		# look at page 406, there is reference to a calculation by Raymer
 		self.airframe_fraction = 0.25 # this number is too small, was made this size to make solution exist
 
@@ -70,6 +71,7 @@ class Aircraft:
 
 	def get_power_required_v_max(self):
 		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
+		print(K)
 		W_2 = self.weight * self.weight_ratios[0]* self.weight_ratios[1]
 		W_mc = 0.5*W_2*(1+self.weight_ratios[2])
 		T = W_mc * (0.5*AIR_DENSITY_CRUISE*self.flight.v_max**2*self.airfoil.Cdo/(W_mc/self.S)+2*K*W_mc/(AIR_DENSITY_CRUISE*self.flight.v_max**2*self.S))
@@ -84,15 +86,26 @@ class Aircraft:
 
 	def get_power_required_takeoff(self):
 		# TODO: This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
+
 		s_g_times_TWR = (1.21*(self.wing_loading_max) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
 
 		v_stall_takeoff = np.sqrt(2*self.wing_loading_max/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
 		R = 6.96 * v_stall_takeoff ** 2 / GRAVITY
 		take_off_angle = np.arccos(1-(self.flight.obstacle_height/R)) # Eq 6.99
-		s_a = R * np.sin(take_off_angle) # Eq 8.35
+		s_a_profile = R * np.sin(take_off_angle) # Eq 8.35
+		s_a_climb = v_stall_takeoff*(self.flight.obstacle_height/self.flight.rc_max)
+		print(f"s_a_profile: {s_a_profile}")
+		print(f"s_a_climb: {s_a_climb}")
+		s_a = np.max([s_a_profile, s_a_climb])
+		print(f"R:{R}")
+		print(f"angle:{take_off_angle*180/np.pi}")
 
-		TWR_at_seventy_percent_LO = s_g_times_TWR/(self.flight.takeoff_distance-s_a) # Eq 8.36
-
+		# TWR_at_seventy_percent_LO = s_g_times_TWR/(self.flight.takeoff_distance-s_a) # Eq 8.36
+		s_g = self.flight.takeoff_distance - s_a
+		a = 0.5 * AIR_DENSITY_GROUND * v_stall_takeoff ** 2 * self.S
+		L = self.airfoil.max_cL_half_flaps * a
+		D = L / self.LD_ratio
+		TWR_at_seventy_percent_LO = (D/self.weight)+(mu_no_brakes*(1-L/self.weight))+(1.21*self.weight/self.S)/((s_g-1.1*N*np.sqrt((2*self.weight)/(AIR_DENSITY_GROUND*self.S*self.airfoil.max_cL_half_flaps)))*GRAVITY*AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps)
 		# Eq 8.37
 		V = 0.7 * 1.1 * v_stall_takeoff
 		T = TWR_at_seventy_percent_LO * self.weight
@@ -108,7 +121,7 @@ class Aircraft:
 
 		wing_loading_stall = 0.5*AIR_DENSITY_GROUND*self.flight.v_stall**2 * self.airfoil.max_cL_full_flaps # Eq 8.27
 		# setting  up coefficients for quadratic formula
-		a = j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu)
+		a = j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu_brakes)
 		b = j * N * np.sqrt(2 / (AIR_DENSITY_GROUND*self.airfoil.max_cL_full_flaps))
 		c = - self.flight.landing_distance
 		print(a,b,c)
@@ -130,10 +143,10 @@ class Flight:
 		self.v_max = 200 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR
 		self.v_stall = stall
 		self.v_flare = self.v_stall * 1.23
-		self.landing_distance = 2200 # ft, maybe move out the magic number
-		self.takeoff_distance = 2200 # ft, maybe move out the magic number
-		self.obstacle_height = 50 # ft
-		self.rc_max = 1 #ft/s
+		self.landing_distance = 5280 * 3 # ft, maybe move out the magic number
+		self.takeoff_distance = 5280 * 3 # ft, maybe move out the magic number
+		self.obstacle_height = 10 # ft
+		self.rc_max = 2 #ft/s
 
 
 class Airfoil:
@@ -165,7 +178,7 @@ def main():
 	CREW = 2 # people
 	FLIGHT_TIME = 10 # days
 	SAFETY_FACTOR = 1.01
-	V_STALL = 120 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
+	V_STALL = 180 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
 
 	# this just stores the goal, vs details of aircraft
 	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
