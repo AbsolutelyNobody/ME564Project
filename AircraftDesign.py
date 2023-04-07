@@ -31,7 +31,7 @@ class Aircraft:
 		self.prop_efficiency = 0.85
 		self.LD_ratio = 27 # TODO: this will come from airfoild
 		# look at page 406, there is reference to a calculation by Raymer
-		self.airframe_fraction = 0.20 # this number is too small, was made this size to make solution exist
+		self.airframe_fraction = 0.25 # this number is too small, was made this size to make solution exist
 
 		cruise_ratio = 1/exp(self.fuel_consumption/self.prop_efficiency*self.flight.range/self.LD_ratio) # Eq 8.15
 		# takeoff, climb, cruise, descent, landing
