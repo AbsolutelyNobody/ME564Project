@@ -1,4 +1,5 @@
 from math import exp
+import json
 
 import numpy as np
 
@@ -8,7 +9,7 @@ MILES_TO_FEET = 5280
 KG_TO_LBS = 2.2
 GRAVITY = 32.2 #lbf
 AIR_DENSITY_GROUND = 0.002377 #slug/ft^3
-AIR_DENSITY_CRUISE = 0.0012673 # slug/ft^3 at 20000 feet? Idk why they immediately assumed this
+AIR_DENSITY_CRUISE = 0.0013553 # slug/ft^3 at 18000 feet
 SECONDS_PER_HOUR = 60*60
 FT_LBS_PER_S_PER_HP = 550
 
@@ -24,10 +25,11 @@ CREW_PAYLOAD_WEIGHT = 10 # kg, food, water, and personal items per person
 
 class Aircraft:
 	# these are class variables, things apparently true for all aircraft
-	def __init__(self, flight, airfoil):
+	def __init__(self, flight, airfoil, engine):
 		# Step 1: Provide a first estimate of key quantities (Ch8/pg.401)
 		self.flight = flight
 		self.airfoil = airfoil
+		self.engine = engine
 		self.fuel_consumption = 2.02*10**(-7)
 		self.prop_efficiency = 0.85
 		self.LD_ratio = 26 # TODO: this will come from airfoild
@@ -172,6 +174,14 @@ class Airfoil:
 				max_cl = cl
 		return max_cl
 
+class Engine:
+	def __init__(self, filename):
+		with open(filename) as f:
+			data = json.load(f)
+		self.nominal_power = data['power'] # we are going to use nominal power, because we can just fly at 18000 feet
+		self.turbocharged_to = data['turbocharged_to']
+		self.weight = data['weight']
+
 def main():
 	# Flight information
 	R = 40000 # km
@@ -183,11 +193,15 @@ def main():
 	# this just stores the goal, vs details of aircraft
 	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
 
-	# running this extracts the current estimate
+	# could be swapped for a different airfoil profile if we wanted
 	airfoil = Airfoil('./xf-r1046-il-1000000.csv')
 
+	# engine details
+	engine = Engine('./textron_540_v.json')
+
+
 	# creating the aircraft sets up an initial guess for key quantities
-	aircraft = Aircraft(flight, airfoil)
+	aircraft = Aircraft(flight, airfoil, engine)
 
 if __name__ == '__main__':
 	main()
