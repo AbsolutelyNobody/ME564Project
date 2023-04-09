@@ -4,6 +4,7 @@ import json
 from matplotlib import pyplot as plt
 import numpy as np
 
+# on page 438  of page 458-398 (40/60 pages done)
 # Physical Constants
 KM_TO_MILES = 5/8
 MILES_TO_FEET = 5280
@@ -69,7 +70,7 @@ class Aircraft:
 
 		print(f"Aspect Ratio: {self.AR}")
 
-		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry()
+		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry(self.S, self.AR, self.taper_ratio)
 
 		print("\nSingle wing geometry")
 		print(f"semi-span: {self.b/2}")
@@ -86,16 +87,34 @@ class Aircraft:
 		print(f"\nfuel storeable in wings: {wing_fuel} ft^3 or {wing_fuel/self.fuel_vol_est}")
 		print("no fuel in wings, this isn't significant")
 
-		cog_no_wing, cog_wing, fuselage_length, wing_center_geo = self.place_components()
+		cog_no_wing, self.cog_wing, self.fuselage_length, wing_center_geo = self.place_components()
 		print(f"cog without wing included: {cog_no_wing} ft")
-		print(f"cog with wing included: {cog_wing} ft")
-		print(f"front of engine to back of fuel tank: {fuselage_length} ft")
+		print(f"cog with wing included: {self.cog_wing} ft")
+		print(f"front of engine to back of fuel tank: {self.fuselage_length} ft")
 		print(f"front of engine to middle of wing: {wing_center_geo} ft")
+
+		self.calculate_tail()
 
 
 	def calculate_tail(self):
-		v_ht = 0.7
-		v_vt = 0.04
+		v_ht = 0.7 # from literature
+		v_vt = 0.04 # from literature
+		l_ht_from_tip = self.fuselage_length-1 # ft, chosen arbitrarily, but generally near total fuselage length
+
+		S_ht = v_ht*self.c_bar*self.S/(l_ht_from_tip-self.cog_wing)
+
+		l_vt = (l_ht_from_tip-self.cog_wing) - 1 # arbitrarily, they used 1.13, I rounded
+		S_vt = v_vt * self.b*self.S / l_vt
+
+		print(f"Tail areas: {S_ht} ft^2 (horizontal), {S_vt} ft^2 (vertical)")
+
+		b_ht, cr_ht, ct_ht, y_bar_ht, c_bar_ht = self.determine_wing_geometry(S_ht, 4, 0.5) # arbitrary AR and taper
+		b_vt, cr_vt, ct_vt, z_bar_vt_by_two, c_bar_vt = self.determine_wing_geometry(S_vt, 1.5, 0.5) # arbitrary AR and taper
+		z_bar_vt = 2 * z_bar_vt_by_two
+
+		print("\nTail dimension (span, root, tip)")
+		print(f"Horizontal: {b_ht}, {cr_ht}, {ct_ht}")
+		print(f"Vertical: {b_vt}, {cr_vt}, {ct_vt}")
 
 
 	def place_components(self):
@@ -113,6 +132,7 @@ class Aircraft:
 		fuselage_height = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
 
 		fuel_tank_front = seats_back
+		# this next bit basically assumes no taper at end, just big box, we should change that
 		fuel_tank_back = fuel_tank_front+self.fuel_vol_est/((fuselage_height-0.5)*(fuselage_width-0.5))
 		fuel_tank_center = (fuel_tank_back-fuel_tank_front) / 2
 		weight_no_wing = (self.engine.weight+self.flight.weight_stuff+self.fuel_weight_est)
@@ -154,13 +174,13 @@ class Aircraft:
 		# I already wrote the call and print bit in init before I realized there is no math
 		return "mid-wing"
 
-	def determine_wing_geometry(self):
-		b = np.sqrt(self.S * self.AR)
-		cr = 2 * self.S / ((self.taper_ratio + 1) * b)
-		ct = self.taper_ratio * cr
+	def determine_wing_geometry(self, S, AR, taper_ratio):
+		b = np.sqrt(S * AR)
+		cr = 2 * S / ((taper_ratio + 1) * b)
+		ct = taper_ratio * cr
 
-		y_bar = (b / 6) * ((1 + 2 * self.taper_ratio) / (1 + self.taper_ratio))
-		c_bar = (2 / 3) * cr * ((1 + self.taper_ratio + self.taper_ratio ** 2) / (1 + self.taper_ratio))
+		y_bar = (b / 6) * ((1 + 2 * taper_ratio) / (1 + taper_ratio))
+		c_bar = (2 / 3) * cr * ((1 + taper_ratio + taper_ratio ** 2) / (1 + taper_ratio))
 		return b, cr, ct, y_bar, c_bar
 
 	def determine_TWR_AR(self):
