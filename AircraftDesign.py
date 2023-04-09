@@ -1,6 +1,7 @@
 from math import exp
 import json
 
+from matplotlib import pyplot as plt
 import numpy as np
 
 # Physical Constants
@@ -12,6 +13,9 @@ AIR_DENSITY_GROUND = 0.002377 #slug/ft^3
 AIR_DENSITY_CRUISE = 0.0013553 # slug/ft^3 at 18000 feet
 SECONDS_PER_HOUR = 60*60
 FT_LBS_PER_S_PER_HP = 550
+AV_GAS_DENSITY = 5.64 # lb / gal
+CUBIC_FEET_PER_GALLON = 0.134 # ft^3/gal
+INCHES_PER_FOOT = 12
 
 # Things that the textbook declares to be true
 j = 1.15
@@ -33,6 +37,7 @@ class Aircraft:
 		self.fuel_consumption = 2.02*10**(-7)
 		self.prop_efficiency = 0.85
 		self.LD_ratio = 26 # TODO: this will come from airfoild
+		self.taper_ratio = 0.3
 		# look at page 406, there is reference to a calculation by Raymer
 		self.airframe_fraction = 0.25 # this number is too small, was made this size to make solution exist
 
@@ -47,6 +52,12 @@ class Aircraft:
 
 		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
 		print(f"Initial weight estimate: {self.weight} lbs")
+		self.fuel_weight_est = self.weight * self.fuel_fraction
+		print(f"Initial fuel mass estimate: {self.fuel_weight_est} lbs")
+
+		print(f"Initial fuel vol estimate: {self.weight * self.fuel_fraction/AV_GAS_DENSITY} gal")
+		self.fuel_vol_est = self.weight * self.fuel_fraction/AV_GAS_DENSITY * CUBIC_FEET_PER_GALLON
+		print(f"Initial fuel vol estimate: {self.fuel_vol_est} ft^3")
 
 		# Sec 8.4.2
 		self.wing_loading_max = self.determine_wing_loading()
@@ -58,6 +69,99 @@ class Aircraft:
 
 		print(f"Aspect Ratio: {self.AR}")
 
+		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry()
+
+		print("\nSingle wing geometry")
+		print(f"semi-span: {self.b/2}")
+		print(f"root chord: {self.cr}")
+		print(f"tip chord: {self.ct}")
+		print(f"y bar: {self.y_bar}")
+		print(f"c bar: {self.c_bar}")
+
+		self.wing_location = self.select_wing_location()
+		print(f"wing location: {self.wing_location}")
+
+		# checkpoint: 8.6.4 - Fuselage Configuration
+		wing_fuel = self.fuel_in_wings()
+		print(f"\nfuel storeable in wings: {wing_fuel} ft^3 or {wing_fuel/self.fuel_vol_est}")
+		print("no fuel in wings, this isn't significant")
+
+		cog_no_wing, cog_wing, fuselage_length, wing_center_geo = self.place_components()
+		print(f"cog without wing included: {cog_no_wing} ft")
+		print(f"cog with wing included: {cog_wing} ft")
+		print(f"front of engine to back of fuel tank: {fuselage_length} ft")
+		print(f"front of engine to middle of wing: {wing_center_geo} ft")
+
+
+	def calculate_tail(self):
+		v_ht = 0.7
+		v_vt = 0.04
+
+
+	def place_components(self):
+		# assuming rectangular for now
+		engine_front = 0
+		engine_back = engine_front + self.engine.dimensions[0] / INCHES_PER_FOOT
+		engine_center = (engine_back - engine_front) / 2
+
+		length_seats = 3 # ft
+		seats_front = engine_back
+		seats_back = seats_front  + length_seats
+		seats_center = (seats_back-seats_front) / 2
+
+		fuselage_width = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
+		fuselage_height = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
+
+		fuel_tank_front = seats_back
+		fuel_tank_back = fuel_tank_front+self.fuel_vol_est/((fuselage_height-0.5)*(fuselage_width-0.5))
+		fuel_tank_center = (fuel_tank_back-fuel_tank_front) / 2
+		weight_no_wing = (self.engine.weight+self.flight.weight_stuff+self.fuel_weight_est)
+		cog_no_wing = (engine_center * self.engine.weight + seats_center * self.flight.weight_stuff + fuel_tank_center * self.fuel_weight_est)/weight_no_wing
+
+		wing_mac = cog_no_wing
+		print((self.cr-self.ct) * self.y_bar/(self.b/2))
+		print(self.y_bar)
+		wing_center_geo = wing_mac + 0.25 * self.c_bar
+		wing_cog = wing_mac + (0.4-0.25) * self.c_bar
+		wing_weight = 2.5 * self.S
+		overall_cog = (cog_no_wing * weight_no_wing + wing_cog * wing_weight) / (wing_weight+weight_no_wing)
+		return cog_no_wing, overall_cog, fuel_tank_back, wing_center_geo
+
+
+
+
+	def fuel_in_wings(self):
+		geo = self.airfoil.airfoil_geometry
+		N_span = 100 # number of slices in the spanwise direction (for single wing)
+		d_span = (self.b/2) / N_span
+		N_chord = len(self.airfoil.airfoil_geometry)
+
+		volume = 0
+		length = 0
+		for span_index in range(N_span):
+			c = self.cr - (self.cr-self.ct) * ((span_index+0.5)/N_span)
+			length = length+d_span
+			for chord_index in range(N_chord-1):
+				slice_width = (geo[chord_index+1,0] - geo[chord_index,0]) * c
+				average_top = (geo[chord_index+1,1]+geo[chord_index,1])/2 * c
+				average_bottom = (geo[chord_index+1,2]+geo[chord_index,2])/2 * c
+				slice_height = average_top - average_bottom
+				volume = volume + slice_height * slice_width * d_span
+		return volume
+
+
+	def select_wing_location(self):
+		# I already wrote the call and print bit in init before I realized there is no math
+		return "mid-wing"
+
+	def determine_wing_geometry(self):
+		b = np.sqrt(self.S * self.AR)
+		cr = 2 * self.S / ((self.taper_ratio + 1) * b)
+		ct = self.taper_ratio * cr
+
+		y_bar = (b / 6) * ((1 + 2 * self.taper_ratio) / (1 + self.taper_ratio))
+		c_bar = (2 / 3) * cr * ((1 + self.taper_ratio + self.taper_ratio ** 2) / (1 + self.taper_ratio))
+		return b, cr, ct, y_bar, c_bar
 
 	def determine_TWR_AR(self):
 		takeoff_power = self.get_power_required_takeoff()
@@ -87,9 +191,6 @@ class Aircraft:
 		return AR, P
 
 	def get_power_required_takeoff(self):
-		# TODO: This below eq may be very incorrect, since it assumes that drag and friction are negligible, which might be wrong
-
-		s_g_times_TWR = (1.21*(self.wing_loading_max) / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps)) # Eq 8.34
 
 		v_stall_takeoff = np.sqrt(2*self.wing_loading_max/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
 		R = 6.96 * v_stall_takeoff ** 2 / GRAVITY
@@ -152,8 +253,9 @@ class Flight:
 
 
 class Airfoil:
-	def __init__(self, filepath):
-		self.airfoil_data = np.genfromtxt(filepath, delimiter=',')
+	def __init__(self, performance_file, geometry_file):
+		self.airfoil_performance = np.genfromtxt(performance_file, delimiter=',')
+		self.airfoil_geometry = np.genfromtxt(geometry_file, delimiter=',')
 		self.max_cl = self.get_max_cl()
 		# using only l/L to distinguish seems bad, but they do it
 		self.max_cl_full_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
@@ -168,11 +270,16 @@ class Airfoil:
 
 	def get_max_cl(self):
 		max_cl = 0
-		for line in self.airfoil_data:
+		for line in self.airfoil_performance:
 			cl = line[1]
 			if cl>max_cl:
 				max_cl = cl
 		return max_cl
+
+	def plot_airfoil(self):
+		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,1])
+		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,2])
+		plt.show()
 
 class Engine:
 	def __init__(self, filename):
@@ -180,7 +287,9 @@ class Engine:
 			data = json.load(f)
 		self.nominal_power = data['power'] # we are going to use nominal power, because we can just fly at 18000 feet
 		self.turbocharged_to = data['turbocharged_to']
-		self.weight = data['weight']
+		self.weight = 1.4 * data['nominal_weight'] # 1.4 is estimate from raynor for installed weight
+		self.dimensions = [data['length'], data['width'], data['height']]
+
 
 def main():
 	# Flight information
@@ -194,7 +303,7 @@ def main():
 	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
 
 	# could be swapped for a different airfoil profile if we wanted
-	airfoil = Airfoil('./xf-r1046-il-1000000.csv')
+	airfoil = Airfoil('./xf-r1046-il-1000000.csv', './airfoil_profile.csv')
 
 	# engine details
 	engine = Engine('./textron_540_v.json')
@@ -202,6 +311,8 @@ def main():
 
 	# creating the aircraft sets up an initial guess for key quantities
 	aircraft = Aircraft(flight, airfoil, engine)
+
+	airfoil.plot_airfoil()
 
 if __name__ == '__main__':
 	main()
