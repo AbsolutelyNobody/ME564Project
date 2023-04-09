@@ -95,6 +95,7 @@ class Aircraft:
 
 		self.calculate_tail()
 
+		# next step is propellor, 8.6.6
 
 	def calculate_tail(self):
 		v_ht = 0.7 # from literature
