@@ -103,7 +103,40 @@ class Aircraft:
 
 		self.other_configuration_stuff()
 
-		self.updated_weight_estimate()
+		self.weight = self.updated_weight_estimate()
+
+		self.updated_performance()
+
+	def updated_performance(self):
+		wing_loading = self.weight / self.S
+		power_loading = self.weight / self.engine.nominal_power
+
+		print("\n\nFinal Evaluation of Perfomance")
+
+		print("\nKey Performance numbers")
+		print(f"Wing Loading {wing_loading} lb/ft^2")
+		print(f"Power Loading {power_loading} lb/hp")
+
+		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
+		print("\nKey Aero Parameters")
+		print(f"Cdo {self.airfoil.Cdo}")
+		print(f"K {K}")
+		print(f"Cl_max {self.airfoil.max_cL}")
+		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
+
+
+		print("\nOther Paramaters")
+		# solve nightmare shit
+		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
+		d = -self.engine.nominal_power
+		c = 0
+		b = 0
+		a = 0.5*AIR_DENSITY_CRUISE*self.airfoil.Cdo*self.S
+		v_max = np.polynomial.polynomial.polyroots([e,d,c,b,a])
+		print(f"V_max: {v_max}")
+
+
+
 
 
 	def updated_weight_estimate(self):
@@ -125,6 +158,7 @@ class Aircraft:
 		weight = (self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (1-fraction_other-fraction_landing_gear)
 		print(f"Updated weight estimate: {weight} lbs")
 		print(f"Updated weight changed by: {weight - self.weight}")
+		return weight
 
 	def other_configuration_stuff(self):
 		print("5 degree dihedral from previous designs")
@@ -291,6 +325,7 @@ class Aircraft:
 		P = T*self.flight.v_max/self.prop_efficiency
 		return P
 
+
 	def get_power_required_climb_and_AR(self):
 		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
 		AR = 1/(np.pi*self.airfoil.e*K)
@@ -364,6 +399,7 @@ class Airfoil:
 		self.airfoil_performance = np.genfromtxt(performance_file, delimiter=',')
 		self.airfoil_geometry = np.genfromtxt(geometry_file, delimiter=',')
 		self.max_cl = self.get_max_cl()
+		self.max_cL = self.max_cl * 0.9
 		# using only l/L to distinguish seems bad, but they do it
 		self.max_cl_full_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
 		self.max_cL_full_flaps = 0.9 * self.max_cl_full_flaps # Eq 8.24
