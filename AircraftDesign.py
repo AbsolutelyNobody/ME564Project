@@ -4,7 +4,7 @@ import json
 from matplotlib import pyplot as plt
 import numpy as np
 
-# on page 438  of page 458-398 (40/60 pages done)
+# on page 448  of page 458-398 (50/60 pages done)
 # Physical Constants
 KM_TO_MILES = 5/8
 MILES_TO_FEET = 5280
@@ -96,6 +96,54 @@ class Aircraft:
 		self.calculate_tail()
 
 		# next step is propellor, 8.6.6
+		self.prop_diam = self.propellor_calc()
+
+		self.landing_gear_and_wing_placement_calc()
+
+	def landing_gear_and_wing_placement_calc(self):
+		height_off_ground = 0.75 + self.prop_diam/2
+		Vht = 0.7 # from literature
+		x_n = 0.1 * self.c_bar + self.cog_wing
+		x_ac_wing = x_n - Vht
+		x_geometric_center = x_ac_wing - (0.25 * self.c_bar)
+		x_leading = x_geometric_center + 0.5 * self.cr
+		print(f"Tried to place landing gear {x_geometric_center} ft back from nose to be on wing")
+		print(f"Entire wing is forward of cog, using bicycle arrangement instead")
+
+
+
+		A_d = 1.51
+		B_d = 0.349
+
+		A_w = 0.715
+		B_w = 0.312
+
+		nose_wheel_placement = 2 # ft, arbitrary
+		main_wheel_placement = 4 # ft back from cog, because we can't place it on wing, its too far forward
+		x_1 = self.cog_wing - nose_wheel_placement
+		x_2 = main_wheel_placement
+		x_3 = x_1 + x_2
+
+
+		F_M = self.weight * x_1 / x_3
+		F_N = self.weight * x_2 / x_3
+		wheel_N_diameter = A_d * F_N ** B_d
+		wheel_N_width = A_w * F_N ** B_w
+		wheel_M_diameter = A_d * F_M ** B_d
+		wheel_M_width = A_w * F_M  ** B_w
+
+		print(f"Wheel_N: {wheel_N_diameter} in diameter, {wheel_N_width} in width")
+		print(f"Wheel_M: {wheel_M_diameter} in diameter, {wheel_M_width} in width")
+		print(f"Bicycle wheel requires two extra little wheels for roll stability, these have been ignored for now")
+
+
+	def propellor_calc(self):
+		D = 18 * (self.P/FT_LBS_PER_S_PER_HP) ** (1/4) / INCHES_PER_FOOT
+		V_tip_0 = np.pi * (self.engine.rpm/60) * D
+		V_tip = np.sqrt(V_tip_0**2 + self.flight.v_max**2)
+
+		print(f"Propellor: {D} ft, {V_tip_0} ft/s at tip, {V_tip} ft/s relative")
+		return D
 
 	def calculate_tail(self):
 		v_ht = 0.7 # from literature
@@ -310,6 +358,7 @@ class Engine:
 		self.turbocharged_to = data['turbocharged_to']
 		self.weight = 1.4 * data['nominal_weight'] # 1.4 is estimate from raynor for installed weight
 		self.dimensions = [data['length'], data['width'], data['height']]
+		self.rpm = data['rpm']
 
 
 def main():
