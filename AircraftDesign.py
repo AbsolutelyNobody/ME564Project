@@ -100,6 +100,15 @@ class Aircraft:
 
 		self.landing_gear_and_wing_placement_calc()
 
+		self.other_configuration_stuff()
+
+	def other_configuration_stuff(self):
+		print("5 degree dihedral from previous designs")
+		print("make the control surfaces 30% of local chord")
+		print("hatch located next to seats")
+		print("make the airlerons 50% of the wing length")
+		
+
 	def landing_gear_and_wing_placement_calc(self):
 		height_off_ground = 0.75 + self.prop_diam/2
 		Vht = 0.7 # from literature
