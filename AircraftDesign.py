@@ -37,6 +37,7 @@ class Aircraft:
 		self.engine = engine
 		self.fuel_consumption = 2.02*10**(-7)
 		self.prop_efficiency = 0.85
+		self.fuselage_diam = 4.5
 		self.LD_ratio = 26 # TODO: this will come from airfoild
 		self.taper_ratio = 0.3
 		# look at page 406, there is reference to a calculation by Raymer
@@ -87,10 +88,10 @@ class Aircraft:
 		print(f"\nfuel storeable in wings: {wing_fuel} ft^3 or {wing_fuel/self.fuel_vol_est}")
 		print("no fuel in wings, this isn't significant")
 
-		cog_no_wing, self.cog_wing, self.fuselage_length, wing_center_geo = self.place_components()
+		cog_no_wing, self.cog_wing, self.body_lengths, wing_center_geo = self.place_components()
 		print(f"cog without wing included: {cog_no_wing} ft")
 		print(f"cog with wing included: {self.cog_wing} ft")
-		print(f"front of engine to back of fuel tank: {self.fuselage_length} ft")
+		print(f"front of engine to back of fuel tank: {self.body_lengths[4]} ft")
 		print(f"front of engine to middle of wing: {wing_center_geo} ft")
 
 		self.Sht, self.Svt = self.calculate_tail()
@@ -102,15 +103,28 @@ class Aircraft:
 
 		self.other_configuration_stuff()
 
+		self.updated_weight_estimate()
+
 
 	def updated_weight_estimate(self):
-		wing_weight = 2.5 * self.S
-		horiz_tail_weight = 2 * self.Sht
-		vert_tail_weight = 2 * self.Svt
-		fraction_other = 0.1
+		wing_weight = 1.25 * self.S
+		horiz_tail_weight = 1.25 * self.Sht
+		vert_tail_weight = 1.25 * self.Svt
+		fraction_other = 0.05
 		fraction_landing_gear = 0.057
+		engine_bay_length = self.body_lengths[1] - self.body_lengths[0]
+		main_fuselage_length = self.body_lengths[3] - self.body_lengths[1]
+		final_taper_length = self.body_lengths[4] - self.body_lengths[3]
+
+		Area_nose = np.pi * self.fuselage_diam * np.sqrt(engine_bay_length**2+self.fuselage_diam**2)
+		Area_body = self.fuselage_diam ** 2 * main_fuselage_length
+		Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length**2+self.fuselage_diam**2)
+		S_wet = Area_nose + Area_body + Area_taper
+		fuselage_weight = S_wet * 1.4
 
 		weight = (self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (1-fraction_other-fraction_landing_gear)
+		print(f"Updated weight estimate: {weight} lbs")
+		print(f"Updated weight changed by: {weight - self.weight}")
 
 	def other_configuration_stuff(self):
 		print("5 degree dihedral from previous designs")
@@ -167,7 +181,7 @@ class Aircraft:
 	def calculate_tail(self):
 		v_ht = 0.7 # from literature
 		v_vt = 0.04 # from literature
-		l_ht_from_tip = self.fuselage_length-1 # ft, chosen arbitrarily, but generally near total fuselage length
+		l_ht_from_tip = self.body_lengths[4]-1 # ft, chosen arbitrarily, but generally near total fuselage length
 
 		S_ht = v_ht*self.c_bar*self.S/(l_ht_from_tip-self.cog_wing)
 
@@ -215,7 +229,10 @@ class Aircraft:
 		wing_cog = wing_mac + (0.4-0.25) * self.c_bar
 		wing_weight = 2.5 * self.S
 		overall_cog = (cog_no_wing * weight_no_wing + wing_cog * wing_weight) / (wing_weight+weight_no_wing)
-		return cog_no_wing, overall_cog, fuel_tank_back, wing_center_geo
+		taper_length = 4
+		taper_front = fuel_tank_back
+		taper_back = taper_front + taper_length
+		return cog_no_wing, overall_cog, [0, engine_back, seats_back, fuel_tank_back, taper_back], wing_center_geo
 
 
 
