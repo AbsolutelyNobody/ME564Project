@@ -204,7 +204,7 @@ class Aircraft:
 		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
 
 		print("\nOther Paramaters")
-		# solve nightmare shit
+		# solve nightmare shit Eq 5.12 on Pg 220
 		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
 		d = -self.engine.nominal_power*FT_LBS_PER_S_PER_HP
 		c = 0
