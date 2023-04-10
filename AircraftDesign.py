@@ -7,7 +7,7 @@ import numpy as np
 # on page 448  of page 458-398 (50/60 pages done)
 # Physical Constants
 KM_TO_MILES = 5/8
-MILES_TO_FEET = 5280
+FEET_PER_MILE = 5280
 KG_TO_LBS = 2.2
 GRAVITY = 32.2 #lbf
 AIR_DENSITY_GROUND = 0.002377 #slug/ft^3
@@ -121,7 +121,7 @@ class Aircraft:
 		b = j * N * np.sqrt(2 / (AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps))
 		c = - self.flight.landing_distance
 
-		wing_loading_land  = ((-b + np.sqrt(b**2 - 4 * a * c))/(2*a))**2 # solving 8.29
+		wing_loading_land = ((-b + np.sqrt(b**2 - 4 * a * c))/(2*a))**2 # solving 8.29
 		print(f"Found restrictions on wing load: {wing_loading_stall} (stall condition), {wing_loading_land} (landing_conditions)")
 		
 		driving_wing_loading = np.min([wing_loading_land, wing_loading_stall])
@@ -206,12 +206,13 @@ class Aircraft:
 		print("\nOther Paramaters")
 		# solve nightmare shit
 		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
-		d = -self.engine.nominal_power
+		d = -self.engine.nominal_power*FT_LBS_PER_S_PER_HP
 		c = 0
 		b = 0
 		a = 0.5*AIR_DENSITY_CRUISE*self.airfoil.Cdo*self.S
+
 		v_max = np.polynomial.polynomial.polyroots([e,d,c,b,a])
-		print(f"V_max: {v_max}")
+		print(f"V_max: {np.real(v_max[3]/FEET_PER_MILE*SECONDS_PER_HOUR)}")
 	
 	    # Sec 8.6.2 justification in the report
 	def select_wing_location(self):
@@ -244,7 +245,7 @@ class Aircraft:
 		fuselage_height = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
 
 		fuel_tank_front = seats_back
-        # size of the fuel tank section based on the fuel volume estimate
+		# size of the fuel tank section based on the fuel volume estimate
 		fuel_tank_back = fuel_tank_front + self.fuel_vol_est / ((fuselage_height - 0.5) * (fuselage_width - 0.5))
 		fuel_tank_center = (fuel_tank_back + fuel_tank_front) / 2
 		weight_no_wing = (self.engine.weight + self.flight.weight_stuff + self.fuel_weight_est) # stuff includes food, people, and equipment
@@ -414,12 +415,12 @@ class Airfoil:
 # TODO: relocate Flight and Engine into the above sections where they make the most sense, I just don't really know where they go right now
 class Flight:
 	def __init__(self, range, crew, time, safety, stall):
-		self.range = range * KM_TO_MILES * MILES_TO_FEET
+		self.range = range * KM_TO_MILES * FEET_PER_MILE
 		self.crew = crew
 		self.time = time
 		self.weight_stuff = self.crew * (CREW_MEMBER_WEIGHT + CREW_PAYLOAD_WEIGHT) * KG_TO_LBS
 		self.safety = safety
-		self.v_max = 200 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR
+		self.v_max = 200 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_stall = stall
 		self.v_flare = self.v_stall * 1.23
 		self.landing_distance = 5280 * 3 # ft, assuming a ~3 mile runway is about the max practical (assuming access to a military base)
@@ -443,7 +444,7 @@ def main():
 	CREW = 2 # people
 	FLIGHT_TIME = 10 # days
 	SAFETY_FACTOR = 1.01
-	V_STALL = 180 * KM_TO_MILES * MILES_TO_FEET / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
+	V_STALL = 180 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
 
 	# this just stores the goal, vs details of aircraft
 	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
