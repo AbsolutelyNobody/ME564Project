@@ -99,7 +99,7 @@ class Aircraft:
 		self.Sht, self.Svt = self.calculate_tail()
 
 		# next step is propellor, 8.6.6
-		self.prop_diam = self.propellor_calc()
+		self.prop_diam = self.propeller_calc()
 
 		self.landing_gear_and_wing_placement_calc()
 
@@ -111,36 +111,6 @@ class Aircraft:
 
 # Calculation Functions Below
 
-# Sec 8.4.1
-class Airfoil:
-	def __init__(self, performance_file, geometry_file):
-		self.airfoil_performance = np.genfromtxt(performance_file, delimiter=',')
-		self.airfoil_geometry = np.genfromtxt(geometry_file, delimiter=',')
-		self.max_cl = self.get_max_cl()
-		self.max_cL = self.max_cl * 0.9
-		# using only l/L to distinguish seems bad, but they do it
-		self.max_cl_full_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
-		self.max_cL_full_flaps = 0.9 * self.max_cl_full_flaps # Eq 8.24
-
-		self.max_cl_half_flaps = 0.5 + self.max_cl
-		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
-
-		self.e = 0.6 # TODO: I don't think this is right
-		self.Cdo = 4 * 0.0043 # TODO: I don't think this is right
-
-
-	def get_max_cl(self):
-		max_cl = 0
-		for line in self.airfoil_performance:
-			cl = line[1]
-			if cl>max_cl:
-				max_cl = cl
-		return max_cl
-
-	def plot_airfoil(self):
-		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,1])
-		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,2])
-		plt.show()
 
 # Sec 8.4.2
 	def determine_wing_loading(self):
@@ -408,6 +378,38 @@ class Airfoil:
 				slice_height = average_top - average_bottom
 				volume = volume + slice_height * slice_width * d_span
 		return volume
+
+# Sec 8.4.1
+class Airfoil:
+	def __init__(self, performance_file, geometry_file):
+		self.airfoil_performance = np.genfromtxt(performance_file, delimiter=',')
+		self.airfoil_geometry = np.genfromtxt(geometry_file, delimiter=',')
+		self.max_cl = self.get_max_cl()
+		self.max_cL = self.max_cl * 0.9
+		# using only l/L to distinguish seems bad, but they do it
+		self.max_cl_full_flaps = 0.9 + self.max_cl # idk why tf this is, but -\_o_/-
+		self.max_cL_full_flaps = 0.9 * self.max_cl_full_flaps # Eq 8.24
+
+		self.max_cl_half_flaps = 0.5 + self.max_cl
+		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
+
+		self.e = 0.6 # TODO: I don't think this is right
+		self.Cdo = 4 * 0.0043 # TODO: I don't think this is right
+
+
+	def get_max_cl(self):
+		max_cl = 0
+		for line in self.airfoil_performance:
+			cl = line[1]
+			if cl>max_cl:
+				max_cl = cl
+		return max_cl
+
+	def plot_airfoil(self):
+		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,1])
+		plt.scatter(self.airfoil_geometry[:,0], self.airfoil_geometry[:,2])
+		plt.show()
+
 
 # TODO: relocate Flight and Engine into the above sections where they make the most sense, I just don't really know where they go right now
 class Flight:
