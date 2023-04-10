@@ -93,7 +93,7 @@ class Aircraft:
 		print(f"front of engine to back of fuel tank: {self.fuselage_length} ft")
 		print(f"front of engine to middle of wing: {wing_center_geo} ft")
 
-		self.calculate_tail()
+		self.Sht, self.Svt = self.calculate_tail()
 
 		# next step is propellor, 8.6.6
 		self.prop_diam = self.propellor_calc()
@@ -102,12 +102,22 @@ class Aircraft:
 
 		self.other_configuration_stuff()
 
+
+	def updated_weight_estimate(self):
+		wing_weight = 2.5 * self.S
+		horiz_tail_weight = 2 * self.Sht
+		vert_tail_weight = 2 * self.Svt
+		fraction_other = 0.1
+		fraction_landing_gear = 0.057
+
+		weight = (self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (1-fraction_other-fraction_landing_gear)
+
 	def other_configuration_stuff(self):
 		print("5 degree dihedral from previous designs")
 		print("make the control surfaces 30% of local chord")
 		print("hatch located next to seats")
 		print("make the airlerons 50% of the wing length")
-		
+
 
 	def landing_gear_and_wing_placement_calc(self):
 		height_off_ground = 0.75 + self.prop_diam/2
@@ -174,17 +184,19 @@ class Aircraft:
 		print(f"Horizontal: {b_ht}, {cr_ht}, {ct_ht}")
 		print(f"Vertical: {b_vt}, {cr_vt}, {ct_vt}")
 
+		return S_ht, S_vt
+
 
 	def place_components(self):
 		# assuming rectangular for now
 		engine_front = 0
 		engine_back = engine_front + self.engine.dimensions[0] / INCHES_PER_FOOT
-		engine_center = (engine_back - engine_front) / 2
+		engine_center = (engine_back + engine_front) / 2
 
 		length_seats = 3 # ft
 		seats_front = engine_back
 		seats_back = seats_front  + length_seats
-		seats_center = (seats_back-seats_front) / 2
+		seats_center = (seats_back + seats_front) / 2
 
 		fuselage_width = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
 		fuselage_height = 4.5 #ft, this seems to have been arbitrary, its scaled up from minimum for sitting
@@ -192,7 +204,7 @@ class Aircraft:
 		fuel_tank_front = seats_back
 		# this next bit basically assumes no taper at end, just big box, we should change that
 		fuel_tank_back = fuel_tank_front+self.fuel_vol_est/((fuselage_height-0.5)*(fuselage_width-0.5))
-		fuel_tank_center = (fuel_tank_back-fuel_tank_front) / 2
+		fuel_tank_center = (fuel_tank_back+fuel_tank_front) / 2
 		weight_no_wing = (self.engine.weight+self.flight.weight_stuff+self.fuel_weight_est)
 		cog_no_wing = (engine_center * self.engine.weight + seats_center * self.flight.weight_stuff + fuel_tank_center * self.fuel_weight_est)/weight_no_wing
 
