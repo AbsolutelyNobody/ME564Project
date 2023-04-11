@@ -362,7 +362,7 @@ class Aircraft:
 		print(f"V_max: {np.real(v_max[3]/FEET_PER_MILE*SECONDS_PER_HOUR)}")
 	    
     # Sec 8.8.2 Rate of Climb
-		rc_max = ((self.prop_efficiency * self.engine.nominal_power) / self.weight) - (2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading)**(0.5) * 1.155 / (self.LD_ratio)
+		rc_max = ((self.prop_efficiency * self.engine.nominal_power*FT_LBS_PER_S_PER_HP) / self.weight) - ((2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading))**(0.5) * (1.155 / (self.LD_ratio))
 		print(f"Max rate of climb: {rc_max}")
 
     # calculating how much fuel *could* be stored in the wings, to assess viability
