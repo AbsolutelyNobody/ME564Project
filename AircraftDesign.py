@@ -54,6 +54,7 @@ class Aircraft:
 		self.fuel_fraction  = self.flight.safety * (1-weight_f) # Eq 8.8
 
 		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
+		self.initial_weight_estimation = self.weight
 		print(f"Initial weight estimate: {self.weight} lbs")
 		self.fuel_weight_est = self.weight * self.fuel_fraction
 		print(f"Initial fuel mass estimate: {self.fuel_weight_est} lbs")
@@ -106,7 +107,7 @@ class Aircraft:
 
 		self.other_configuration_stuff()
 
-		self.weight = self.updated_weight_estimate()
+		self.updated_weight_estimate()
 
 		self.updated_performance()
 
@@ -224,8 +225,6 @@ class Aircraft:
 		cog_no_wing = (engine_center * self.engine.weight + seats_center * self.flight.weight_stuff + fuel_tank_center * self.fuel_weight_est) / weight_no_wing
 
 		wing_mac = cog_no_wing
-		print((self.cr-self.ct) * self.y_bar/(self.b/2))
-		print(self.y_bar)
 		wing_center_geo = wing_mac + 0.25 * self.c_bar # geometric wing centrepoint
 		wing_cog = wing_mac + (0.4-0.25) * self.c_bar
 		wing_weight = 2.5 * self.S
@@ -233,7 +232,9 @@ class Aircraft:
 		taper_length = 4
 		taper_front = fuel_tank_back
 		taper_back = taper_front + taper_length
-		return cog_no_wing, overall_cog, [0, engine_back, seats_back, fuel_tank_back, taper_back], wing_center_geo
+		locations = [0, engine_back, seats_back, fuel_tank_back, taper_back]
+		print(f"locations: {locations}")
+		return cog_no_wing, overall_cog, locations, wing_center_geo
 
 
 # Section 8.6.5
@@ -313,17 +314,21 @@ class Aircraft:
 		engine_bay_length = self.body_lengths[1] - self.body_lengths[0]
 		main_fuselage_length = self.body_lengths[3] - self.body_lengths[1]
 		final_taper_length = self.body_lengths[4] - self.body_lengths[3]
+		weight_last_time = 0
+		while(np.abs(self.weight - weight_last_time)/self.weight > 0.000001):
+			Area_nose = np.pi * self.fuselage_diam * np.sqrt(engine_bay_length**2+self.fuselage_diam**2)
+			Area_body = self.fuselage_diam ** 2 * main_fuselage_length
+			Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length**2+self.fuselage_diam**2)
+			S_wet = Area_nose + Area_body + Area_taper
+			fuselage_weight = S_wet * 1.4
 
-		Area_nose = np.pi * self.fuselage_diam * np.sqrt(engine_bay_length**2+self.fuselage_diam**2)
-		Area_body = self.fuselage_diam ** 2 * main_fuselage_length
-		Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length**2+self.fuselage_diam**2)
-		S_wet = Area_nose + Area_body + Area_taper
-		fuselage_weight = S_wet * 1.4
+			weight = (self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (1-fraction_other-fraction_landing_gear)
 
-		weight = (self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (1-fraction_other-fraction_landing_gear)
-		print(f"Updated weight estimate: {weight} lbs")
-		print(f"Updated weight changed by: {weight - self.weight}")
-		return weight
+			weight_last_time = self.weight
+			self.weight = weight
+			self.fuel_weight_est = self.fuel_fraction * self.weight
+		print(f"Updated weight: {self.weight} lbs")
+		print(f"Updated weight changed by: {self.weight - self.initial_weight_estimation}")
 
 	def other_configuration_stuff(self):
 		print("5 degree dihedral from previous designs")
@@ -349,8 +354,9 @@ class Aircraft:
 		print(f"Cl_max {self.airfoil.max_cL}")
 		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
 
-    # Sec 8.8.1 Power Required for Vmax
+    	# Sec 8.8.1 Power Required for Vmax
 		print("\nOther Parameters")
+
 		# solve nightmare shit Eq 5.12 on Pg 220
 		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
 		d = -self.engine.nominal_power*FT_LBS_PER_S_PER_HP
@@ -365,7 +371,7 @@ class Aircraft:
 		rc_max = ((self.prop_efficiency * self.engine.nominal_power*FT_LBS_PER_S_PER_HP) / self.weight) - ((2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading))**(0.5) * (1.155 / (self.LD_ratio))
 		print(f"Max rate of climb: {rc_max}")
 
-		print(f"Range: {'the range should reamin the same, but we arent iterating so its a problem'}")
+		print(f"Range: is already guaranteed, this is the main thing driving the weight")
 
 		stalling_speed = np.sqrt(2/AIR_DENSITY_CRUISE * wing_loading/self.airfoil.max_cL)
 		print(f"Stall speed: {stalling_speed/FEET_PER_MILE*SECONDS_PER_HOUR}")
@@ -374,11 +380,16 @@ class Aircraft:
 
 		R = (1.23 * stalling_speed) ** 2 / (0.2 * GRAVITY)
 		theta = 3
-		h_f = R * (1 - np.cos(np.rad2deg(theta)))
-		s_a = self.flight.obstacle_height-h_f/np.tan(np.rad2deg(theta))
-		s_f = R * np.sin(np.rad2deg(theta))
+
+		h_f = R * (1 - np.cos(np.deg2rad(theta)))
+
+		s_a = (self.flight.obstacle_height-h_f)/np.tan(np.deg2rad(theta))
+		s_f = R * np.sin(np.deg2rad(theta))
 		s_g = j * N * np.sqrt(2 * self.weight / (AIR_DENSITY_GROUND * self.S * self.airfoil.max_cL_full_flaps)) + j**2 * self.weight / self.S / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu_brakes)
-		total_landing_distance = s_a + s_f + s_g
+		# s_a is ignored because our flare height is above our obstacles
+		# the formula therefore yields a negative number
+
+		total_landing_distance = s_f + s_g
 
 		print(f"Landing distance: {total_landing_distance}")
 		v_stall_takeoff = np.sqrt(2*wing_loading/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
@@ -394,7 +405,7 @@ class Aircraft:
 
 
 
-# calculating how much fuel *could* be stored in the wings, to assess viability
+	# calculating how much fuel *could* be stored in the wings, to assess viability
 	def fuel_in_wings(self):
 		geo = self.airfoil.airfoil_geometry
 		N_span = 100 # number of slices in the spanwise direction (for single wing)
