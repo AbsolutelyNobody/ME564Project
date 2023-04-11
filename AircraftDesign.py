@@ -1,3 +1,4 @@
+from cmath import sqrt
 from math import exp
 import json
 
@@ -184,35 +185,6 @@ class Aircraft:
 		minimum_P = P_required / self.prop_efficiency # Eq 8.38
 
 		return minimum_P
-
-# Sec 8.5 
-	def updated_performance(self):
-		wing_loading = self.weight / self.S
-		power_loading = self.weight / self.engine.nominal_power
-
-		print("\n\nFinal Evaluation of Perfomance")
-
-		print("\nKey Performance numbers")
-		print(f"Wing Loading {wing_loading} lb/ft^2")
-		print(f"Power Loading {power_loading} lb/hp")
-
-		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
-		print("\nKey Aero Parameters")
-		print(f"Cdo {self.airfoil.Cdo}")
-		print(f"K {K}")
-		print(f"Cl_max {self.airfoil.max_cL}")
-		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
-
-		print("\nOther Paramaters")
-		# solve nightmare shit Eq 5.12 on Pg 220
-		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
-		d = -self.engine.nominal_power*FT_LBS_PER_S_PER_HP
-		c = 0
-		b = 0
-		a = 0.5*AIR_DENSITY_CRUISE*self.airfoil.Cdo*self.S
-
-		v_max = np.polynomial.polynomial.polyroots([e,d,c,b,a])
-		print(f"V_max: {np.real(v_max[3]/FEET_PER_MILE*SECONDS_PER_HOUR)}")
 	
 	    # Sec 8.6.2 justification in the report
 	def select_wing_location(self):
@@ -359,6 +331,39 @@ class Aircraft:
 		print("hatch located next to seats")
 		print("make the airlerons 50% of the wing length")
 
+	# Sec 8.8 
+	def updated_performance(self):
+		wing_loading = self.weight / self.S
+		power_loading = self.weight / self.engine.nominal_power
+
+		print("\n\nFinal Evaluation of Perfomance")
+
+		print("\nKey Performance numbers")
+		print(f"Wing Loading {wing_loading} lb/ft^2")
+		print(f"Power Loading {power_loading} lb/hp")
+
+		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
+		print("\nKey Aero Parameters")
+		print(f"Cdo {self.airfoil.Cdo}")
+		print(f"K {K}")
+		print(f"Cl_max {self.airfoil.max_cL}")
+		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
+
+    # Sec 8.8.1 Power Required for Vmax
+		print("\nOther Parameters")
+		# solve nightmare shit Eq 5.12 on Pg 220
+		e = 2*K*self.S/AIR_DENSITY_CRUISE*(self.weight/self.S)**2
+		d = -self.engine.nominal_power*FT_LBS_PER_S_PER_HP
+		c = 0
+		b = 0
+		a = 0.5*AIR_DENSITY_CRUISE*self.airfoil.Cdo*self.S
+
+		v_max = np.polynomial.polynomial.polyroots([e,d,c,b,a])
+		print(f"V_max: {np.real(v_max[3]/FEET_PER_MILE*SECONDS_PER_HOUR)}")
+	    
+    # Sec 8.8.2 Rate of Climb
+		rc_max = ((self.prop_efficiency * self.engine.nominal_power) / self.weight) - (2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading)**(0.5) * 1.155 / (self.LD_ratio)
+		print(f"Max rate of climb: {rc_max}")
 
     # calculating how much fuel *could* be stored in the wings, to assess viability
 	def fuel_in_wings(self):
