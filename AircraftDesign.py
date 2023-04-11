@@ -306,7 +306,7 @@ class Aircraft:
 		A_w = 0.715
 		B_w = 0.312
 
-		nose_wheel_placement = 2  # ft, arbitrary
+		nose_wheel_placement = 7  # ft, arbitrary
 		main_wheel_placement = 4  # ft back from cog because we can't place it on wing, its too far forward
 		x_1 = self.cog_wing - nose_wheel_placement
 		x_2 = main_wheel_placement
