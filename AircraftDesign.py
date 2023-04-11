@@ -381,9 +381,15 @@ class Aircraft:
 		total_landing_distance = s_a + s_f + s_g
 
 		print(f"Landing distance: {total_landing_distance}")
+		v_stall_takeoff = np.sqrt(2*wing_loading/(AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps))
 
-		
-		print(f"Takeoff distance: {'todo'}")
+		s_a_to = v_stall_takeoff*(self.flight.obstacle_height/self.flight.rc_max)
+
+		v_lo_seventy_percent = 0.7 * 1.1 * stalling_speed
+		T = self.prop_efficiency * self.engine.nominal_power * FT_LBS_PER_S_PER_HP / v_lo_seventy_percent
+		s_g_to = 1.21 * self.weight / self.S / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps * (T/self.weight))
+		takeoff_distance = s_g_to + s_a_to
+		print(f"Takeoff distance: {takeoff_distance}")
 
 
 
