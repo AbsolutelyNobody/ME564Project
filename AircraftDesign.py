@@ -365,7 +365,18 @@ class Aircraft:
 		rc_max = ((self.prop_efficiency * self.engine.nominal_power*FT_LBS_PER_S_PER_HP) / self.weight) - ((2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading))**(0.5) * (1.155 / (self.LD_ratio))
 		print(f"Max rate of climb: {rc_max}")
 
-    # calculating how much fuel *could* be stored in the wings, to assess viability
+		print(f"Range: {'the range should reamin the same, but we arent iterating so its a problem'}")
+
+		stalling_speed = np.sqrt(2/AIR_DENSITY_CRUISE * wing_loading/self.airfoil.max_cL)
+		print(f"Stall speed: {stalling_speed/FEET_PER_MILE*SECONDS_PER_HOUR}")
+
+		print(f"Landing distance: {'todo'}")
+		print(f"Takeoff distance: {'todo'}")
+
+
+
+
+# calculating how much fuel *could* be stored in the wings, to assess viability
 	def fuel_in_wings(self):
 		geo = self.airfoil.airfoil_geometry
 		N_span = 100 # number of slices in the spanwise direction (for single wing)
