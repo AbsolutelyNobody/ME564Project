@@ -370,7 +370,19 @@ class Aircraft:
 		stalling_speed = np.sqrt(2/AIR_DENSITY_CRUISE * wing_loading/self.airfoil.max_cL)
 		print(f"Stall speed: {stalling_speed/FEET_PER_MILE*SECONDS_PER_HOUR}")
 
-		print(f"Landing distance: {'todo'}")
+
+
+		R = (1.23 * stalling_speed) ** 2 / (0.2 * GRAVITY)
+		theta = 3
+		h_f = R * (1 - np.cos(np.rad2deg(theta)))
+		s_a = self.flight.obstacle_height-h_f/np.tan(np.rad2deg(theta))
+		s_f = R * np.sin(np.rad2deg(theta))
+		s_g = j * N * np.sqrt(2 * self.weight / (AIR_DENSITY_GROUND * self.S * self.airfoil.max_cL_full_flaps)) + j**2 * self.weight / self.S / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu_brakes)
+		total_landing_distance = s_a + s_f + s_g
+
+		print(f"Landing distance: {total_landing_distance}")
+
+		
 		print(f"Takeoff distance: {'todo'}")
 
 
