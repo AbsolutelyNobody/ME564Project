@@ -1,4 +1,3 @@
-from cmath import sqrt
 from math import exp
 import json
 
@@ -19,84 +18,51 @@ AV_GAS_DENSITY = 5.64 # lb / gal
 CUBIC_FEET_PER_GALLON = 0.134 # ft^3/gal
 INCHES_PER_FOOT = 12
 
-# Things that the textbook declares to be true
-j = 1.15
-N = 3
-mu_brakes = 0.4
-mu_no_brakes = 0.04
 
-# Non-technical constants
-CREW_MEMBER_WEIGHT = 70 # kg
-CREW_PAYLOAD_WEIGHT = 10 # kg, food, water, and personal items per person
 
 class Aircraft:
-	# these are class variables, things apparently true for all aircraft
+
+	# Things that the textbook declares to be true
+	j = 1.15
+	N = 3
+	mu_brakes = 0.4
+	mu_no_brakes = 0.04
+	fuel_consumption = 2.02*10**(-7)
+	prop_efficiency = 0.85
+
 	def __init__(self, flight, airfoil, engine):
-		# Step 1: Provide a first estimate of key quantities (Ch8/pg.401)
+
 		self.flight = flight
 		self.airfoil = airfoil
 		self.engine = engine
-		self.fuel_consumption = 2.02*10**(-7)
-		self.prop_efficiency = 0.85
+
 		self.fuselage_diam = 4.5
-		self.LD_ratio = 26 # TODO: this will come from airfoild
-		self.taper_ratio = 0.3
-		# look at page 406, there is reference to a calculation by Raymer
-		self.airframe_fraction = 0.25 # this number is too small, was made this size to make solution exist
+		self.LD_ratio = 26 # Estimated based on the LD ratio of Rutan Voyager
+		self.taper_ratio = 0.3 # look at page 406, there is reference to a calculation by Raymer
+		self.airframe_fraction = 0.25 # Very low, but based on Rutan Voyager
 
-		cruise_ratio = 1/exp(self.fuel_consumption/self.prop_efficiency*self.flight.range/self.LD_ratio) # Eq 8.15
-		# takeoff, climb, cruise, descent, landing
-		# takeoff and climb can probably get closer to 1, since we have so much fuel
-		self.weight_ratios = np.array([0.97, 0.985, cruise_ratio, 1, 0.995]) # fuel_fractions
+		# First weight estimate
+		self.weight, self.weight_ratios, self.fuel_vol_est, self.fuel_weight_est, self.fuel_fraction = self.weight_and_fuel_estimation()
 
-		weight_f = np.prod(self.weight_ratios) # Eq 8.19
-
-		self.fuel_fraction  = self.flight.safety * (1-weight_f) # Eq 8.8
-
-		self.weight = self.flight.weight_stuff/(1-self.fuel_fraction-self.airframe_fraction) # Eq 8.23
-		self.initial_weight_estimation = self.weight
-		print(f"Initial weight estimate: {self.weight} lbs")
-		self.fuel_weight_est = self.weight * self.fuel_fraction
-		print(f"Initial fuel mass estimate: {self.fuel_weight_est} lbs")
-
-		print(f"Initial fuel vol estimate: {self.weight * self.fuel_fraction/AV_GAS_DENSITY} gal")
-		self.fuel_vol_est = self.weight * self.fuel_fraction/AV_GAS_DENSITY * CUBIC_FEET_PER_GALLON
-		print(f"Initial fuel vol estimate: {self.fuel_vol_est} ft^3")
+		self.initial_weight_estimation = self.weight # saved for comparison
 
 		# Sec 8.4.2
-		self.wing_loading_max = self.determine_wing_loading()
-
-		self.S = self.weight / self.wing_loading_max
-		print(f"Wing Area (S): {self.S}")
-
+		self.wing_loading_max, self.S = self.determine_wing_loading()
 
 		# Sec 8.4.3
 		self.P, self.AR = self.determine_TWR_AR()
 
-		print(f"Aspect Ratio: {self.AR}")
 
 		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry(self.S, self.AR, self.taper_ratio)
 
-		print("\nSingle wing geometry")
-		print(f"semi-span: {self.b/2}")
-		print(f"root chord: {self.cr}")
-		print(f"tip chord: {self.ct}")
-		print(f"y bar: {self.y_bar}")
-		print(f"c bar: {self.c_bar}")
+		self.select_wing_location()
 
-		self.wing_location = self.select_wing_location()
-		print(f"wing location: {self.wing_location}")
+		# 8.6.4 - Fuselage Configuration
+		self.fuel_in_wings()
 
-		# checkpoint: 8.6.4 - Fuselage Configuration
-		wing_fuel = self.fuel_in_wings()
-		print(f"\nfuel storeable in wings: {wing_fuel} ft^3 or {wing_fuel/self.fuel_vol_est}")
-		print("no fuel in wings, this isn't significant")
 
-		cog_no_wing, self.cog_wing, self.body_lengths, wing_center_geo = self.place_components()
-		print(f"cog without wing included: {cog_no_wing} ft")
-		print(f"cog with wing included: {self.cog_wing} ft")
-		print(f"front of engine to back of fuel tank: {self.body_lengths[4]} ft")
-		print(f"front of engine to middle of wing: {wing_center_geo} ft")
+		self.cog_wing, self.body_lengths = self.place_components()
+
 
 		self.Sht, self.Svt = self.calculate_tail()
 
@@ -111,16 +77,37 @@ class Aircraft:
 
 		self.updated_performance()
 
-# Calculation Functions Below
+
+	def weight_and_fuel_estimation(self):
+		cruise_ratio = 1/exp(self.fuel_consumption/self.prop_efficiency*self.flight.range/self.LD_ratio) # Eq 8.15
+		# takeoff, climb, cruise, descent, landing
+		# takeoff and climb can probably get closer to 1, since we have so much fuel
+		weight_ratios = np.array([0.97, 0.985, cruise_ratio, 1, 0.995]) # fuel_fractions
+
+		weight_f = np.prod(weight_ratios) # Eq 8.19
+
+		fuel_fraction  = self.flight.safety * (1-weight_f) # Eq 8.8
+
+		weight = self.flight.weight_stuff/(1-fuel_fraction-self.airframe_fraction) # Eq 8.23
+		print(f"Initial weight estimate: {weight} lbs")
+
+		fuel_weight_est = weight * fuel_fraction
+		print(f"Initial fuel mass estimate: {fuel_weight_est} lbs")
+
+		print(f"Initial fuel vol estimate: {weight * fuel_fraction/AV_GAS_DENSITY} gal")
+		fuel_vol_est = weight * fuel_fraction/AV_GAS_DENSITY * CUBIC_FEET_PER_GALLON
+		print(f"Initial fuel vol estimate: {fuel_vol_est} ft^3")
+
+		return weight, weight_ratios, fuel_vol_est, fuel_weight_est, fuel_fraction
 
 
-# Sec 8.4.2
+	# Sec 8.4.2
 	def determine_wing_loading(self):
 
 		wing_loading_stall = 0.5 * AIR_DENSITY_GROUND * self.flight.v_stall**2 * self.airfoil.max_cL_full_flaps # Eq 8.27
 		# setting  up coefficients for the quadratic formula
-		a = j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu_brakes)
-		b = j * N * np.sqrt(2 / (AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps))
+		a = self.j**2/(GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * self.mu_brakes)
+		b = self.j * self.N * np.sqrt(2 / (AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps))
 		c = - self.flight.landing_distance
 
 		wing_loading_land = ((-b + np.sqrt(b**2 - 4 * a * c))/(2*a))**2 # solving 8.29
@@ -128,8 +115,11 @@ class Aircraft:
 		
 		driving_wing_loading = np.min([wing_loading_land, wing_loading_stall])
 		print(f"Minimum W/S: {driving_wing_loading}")
+
+		S = self.weight / driving_wing_loading
+		print(f"Wing Area (S): {S}")
 		
-		return driving_wing_loading
+		return driving_wing_loading, S
 
 		# Sec 8.4.3
 	def determine_TWR_AR(self):
@@ -142,11 +132,11 @@ class Aircraft:
 
 		max_power = np.max([takeoff_power, climb_power, v_max_power])
 		print(f"Maximum of Power Req: {max_power/FT_LBS_PER_S_PER_HP} hp")
+		print(f"AR: {AR}")
 		return max_power, AR
 
 	def get_power_required_v_max(self):
 		K = 1/(4*self.airfoil.Cdo*self.LD_ratio**2)
-		print(K)
 		W_2 = self.weight * self.weight_ratios[0]* self.weight_ratios[1]
 		W_mc = 0.5*W_2*(1+self.weight_ratios[2])
 		T = W_mc * (0.5*AIR_DENSITY_CRUISE*self.flight.v_max**2*self.airfoil.Cdo/(W_mc/self.S)+2*K*W_mc/(AIR_DENSITY_CRUISE*self.flight.v_max**2*self.S))
@@ -177,7 +167,7 @@ class Aircraft:
 		a = 0.5 * AIR_DENSITY_GROUND * v_stall_takeoff ** 2 * self.S
 		L = self.airfoil.max_cL_half_flaps * a
 		D = L / self.LD_ratio
-		TWR_at_seventy_percent_LO = (D/self.weight)+(mu_no_brakes*(1-L/self.weight))+(1.21*self.weight/self.S)/((s_g-1.1*N*np.sqrt((2*self.weight)/(AIR_DENSITY_GROUND*self.S*self.airfoil.max_cL_half_flaps)))*GRAVITY*AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps)
+		TWR_at_seventy_percent_LO = (D/self.weight)+(self.mu_no_brakes*(1-L/self.weight))+(1.21*self.weight/self.S)/((s_g-1.1*self.N*np.sqrt((2*self.weight)/(AIR_DENSITY_GROUND*self.S*self.airfoil.max_cL_half_flaps)))*GRAVITY*AIR_DENSITY_GROUND*self.airfoil.max_cL_half_flaps)
 		# Eq 8.37
 		V = 0.7 * 1.1 * v_stall_takeoff
 		T = TWR_at_seventy_percent_LO * self.weight
@@ -187,10 +177,11 @@ class Aircraft:
 
 		return minimum_P
 	
-	    # Sec 8.6.2 justification in the report
+	# Sec 8.6.2 justification in the report
 	def select_wing_location(self):
 		# I already wrote the call and print bit in init before I realized there is no math
-		return "mid-wing"
+		wing_location = "mid-wing"
+		print(f"wing location: {wing_location}")
 
 	def determine_wing_geometry(self, S, AR, taper_ratio):
 		b = np.sqrt(S * AR)
@@ -199,6 +190,14 @@ class Aircraft:
 
 		y_bar = (b / 6) * ((1 + 2 * taper_ratio) / (1 + taper_ratio))
 		c_bar = (2 / 3) * cr * ((1 + taper_ratio + taper_ratio ** 2) / (1 + taper_ratio))
+
+		print("\nSingle wing geometry")
+		print(f"semi-span: {b/2}")
+		print(f"root chord: {cr}")
+		print(f"tip chord: {ct}")
+		print(f"y bar: {y_bar}")
+		print(f"c bar: {c_bar}")
+
 		return b, cr, ct, y_bar, c_bar
 
 # Sec 8.6.3 & 8.6.4
@@ -233,8 +232,11 @@ class Aircraft:
 		taper_front = fuel_tank_back
 		taper_back = taper_front + taper_length
 		locations = [0, engine_back, seats_back, fuel_tank_back, taper_back]
+		print("locations describe front/back of: engine, seats, fuel_tank, taper")
 		print(f"locations: {locations}")
-		return cog_no_wing, overall_cog, locations, wing_center_geo
+		print(f"cog without wing included: {cog_no_wing} ft")
+		print(f"cog with wing included: {overall_cog} ft")
+		return overall_cog, locations
 
 
 # Section 8.6.5
@@ -354,7 +356,7 @@ class Aircraft:
 		print(f"Cl_max {self.airfoil.max_cL}")
 		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
 
-    	# Sec 8.8.1 Power Required for Vmax
+		# Sec 8.8.1 Power Required for Vmax
 		print("\nOther Parameters")
 
 		# solve nightmare shit Eq 5.12 on Pg 220
@@ -367,7 +369,7 @@ class Aircraft:
 		v_max = np.polynomial.polynomial.polyroots([e,d,c,b,a])
 		print(f"V_max: {np.real(v_max[3]/FEET_PER_MILE*SECONDS_PER_HOUR)}")
 	    
-    # Sec 8.8.2 Rate of Climb
+		# Sec 8.8.2 Rate of Climb
 		rc_max = ((self.prop_efficiency * self.engine.nominal_power*FT_LBS_PER_S_PER_HP) / self.weight) - ((2 / AIR_DENSITY_CRUISE) * np.sqrt(K/(3*self.airfoil.Cdo)) * (wing_loading))**(0.5) * (1.155 / (self.LD_ratio))
 		print(f"Max rate of climb: {rc_max}")
 
@@ -385,7 +387,7 @@ class Aircraft:
 
 		s_a = (self.flight.obstacle_height-h_f)/np.tan(np.deg2rad(theta))
 		s_f = R * np.sin(np.deg2rad(theta))
-		s_g = j * N * np.sqrt(2 * self.weight / (AIR_DENSITY_GROUND * self.S * self.airfoil.max_cL_full_flaps)) + j**2 * self.weight / self.S / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * mu_brakes)
+		s_g = self.j * self.N * np.sqrt(2 * self.weight / (AIR_DENSITY_GROUND * self.S * self.airfoil.max_cL_full_flaps)) + self.j**2 * self.weight / self.S / (GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_full_flaps * self.mu_brakes)
 		# s_a is ignored because our flare height is above our obstacles
 		# the formula therefore yields a negative number
 
@@ -423,6 +425,13 @@ class Aircraft:
 				average_bottom = (geo[chord_index+1,2]+geo[chord_index,2])/2 * c
 				slice_height = average_top - average_bottom
 				volume = volume + slice_height * slice_width * d_span
+		print(f"\nfuel storeable in wings: {volume} ft^3 or {volume/self.fuel_vol_est}")
+
+		if volume/self.fuel_vol_est < 0.25:
+			print("no fuel in wings, this isn't significant")
+		else:
+			print("consider moving fuel to wings")
+
 		return volume
 
 # Sec 8.4.1
@@ -457,16 +466,19 @@ class Airfoil:
 		plt.show()
 
 
-# TODO: relocate Flight and Engine into the above sections where they make the most sense, I just don't really know where they go right now
+# TODO: Load stuff from a file
 class Flight:
-	def __init__(self, range, crew, time, safety, stall):
-		self.range = range * KM_TO_MILES * FEET_PER_MILE
-		self.crew = crew
-		self.time = time
-		self.weight_stuff = self.crew * (CREW_MEMBER_WEIGHT + CREW_PAYLOAD_WEIGHT) * KG_TO_LBS
-		self.safety = safety
+	# Non-technical constants
+	CREW_MEMBER_WEIGHT = 70 # kg
+	CREW_PAYLOAD_WEIGHT = 10 # kg, food, water, and personal items per person
+	def __init__(self):
+		self.range = 40000 * KM_TO_MILES * FEET_PER_MILE
+		self.crew = 2 # people
+		self.time = 10 # days
+		self.weight_stuff = self.crew * (self.CREW_MEMBER_WEIGHT + self.CREW_PAYLOAD_WEIGHT) * KG_TO_LBS
+		self.safety = 1.01 # safety factor
 		self.v_max = 200 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
-		self.v_stall = stall
+		self.v_stall = 180 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_flare = self.v_stall * 1.23
 		self.landing_distance = 5280 * 3 # ft, assuming a ~3 mile runway is about the max practical (assuming access to a military base)
 		self.takeoff_distance = 5280 * 3 # ft
@@ -485,14 +497,9 @@ class Engine:
 
 def main():
 	# Flight information
-	R = 40000 # km
-	CREW = 2 # people
-	FLIGHT_TIME = 10 # days
-	SAFETY_FACTOR = 1.01
-	V_STALL = 180 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR # this is already pretty high, but we can mess with it
 
 	# this just stores the goal, vs details of aircraft
-	flight = Flight(R, CREW, FLIGHT_TIME, SAFETY_FACTOR, V_STALL)
+	flight = Flight()
 
 	# could be swapped for a different airfoil profile if we wanted
 	airfoil = Airfoil('./xf-r1046-il-1000000.csv', './airfoil_profile.csv')
