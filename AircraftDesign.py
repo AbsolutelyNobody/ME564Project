@@ -39,6 +39,7 @@ class Aircraft:
 		self.taper_ratio = 0.3  # look at page 406, there is reference to a calculation by Raymer
 		self.airframe_fraction = 0.25  # Very low, but based on Rutan Voyager
 
+		print("Aircraft Design")
 		# First weight estimate
 		self.weight, self.weight_ratios, self.fuel_vol_est, self.fuel_weight_est, self.fuel_fraction = self.weight_and_fuel_estimation()
 
@@ -51,7 +52,7 @@ class Aircraft:
 		self.P, self.AR = self.determine_TWR_AR()
 
 		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry(self.S, self.AR,
-																						self.taper_ratio)
+																						self.taper_ratio, True, "Main Wing")
 
 		self.select_wing_location()
 
@@ -85,15 +86,16 @@ class Aircraft:
 		fuel_fraction = self.flight.safety * (1 - weight_f)  # Eq 8.8
 
 		weight = self.flight.weight_stuff / (1 - fuel_fraction - self.airframe_fraction)  # Eq 8.23
-		print(f"Initial weight estimate: {weight} lbs")
 
 		fuel_weight_est = weight * fuel_fraction
-		print(f"Initial fuel mass estimate: {fuel_weight_est} lbs")
 
-		print(f"Initial fuel vol estimate: {weight * fuel_fraction / AV_GAS_DENSITY} gal")
 		fuel_vol_est = weight * fuel_fraction / AV_GAS_DENSITY * CUBIC_FEET_PER_GALLON
-		print(f"Initial fuel vol estimate: {fuel_vol_est} ft^3")
 
+		print("\nFuel Estimation:")
+		print(f"\tInitial weight estimate: {weight} lbs")
+		print(f"\tInitial fuel mass estimate: {fuel_weight_est} lbs")
+		print(f"\tInitial fuel vol estimate: {weight * fuel_fraction / AV_GAS_DENSITY} gal")
+		print(f"\tInitial fuel vol estimate: {fuel_vol_est} ft^3")
 		return weight, weight_ratios, fuel_vol_est, fuel_weight_est, fuel_fraction
 
 	# Sec 8.4.2
@@ -106,29 +108,29 @@ class Aircraft:
 		c = - self.flight.landing_distance
 
 		wing_loading_land = ((-b + np.sqrt(b ** 2 - 4 * a * c)) / (2 * a)) ** 2  # solving 8.29
-		print(
-			f"Found restrictions on wing load: {wing_loading_stall} (stall condition), {wing_loading_land} (landing_conditions)")
 
 		driving_wing_loading = np.min([wing_loading_land, wing_loading_stall])
-		print(f"Minimum W/S: {driving_wing_loading}")
+
 
 		S = self.weight / driving_wing_loading
-		print(f"Wing Area (S): {S}")
+		print("\n Initial Wing Loading Info:")
+		print(f"\tFound restrictions on wing load:")
+		print(f"\t\t{wing_loading_stall} (stall condition),")
+		print(f"\t\t{wing_loading_land} (landing_conditions)")
+		print(f"\tMinimum W/S: {driving_wing_loading}")
+		print(f"\tWing Area (S): {S}")
 
 		return driving_wing_loading, S
 
 	# Sec 8.4.3
 	def determine_TWR_AR(self):
+		print("\n Power Estimation:")
 		takeoff_power = self.get_power_required_takeoff()
-		print(f"Power Required for Takeoff: {takeoff_power / FT_LBS_PER_S_PER_HP} hp")
 		AR, climb_power = self.get_power_required_climb_and_AR()
-		print(f"Power Required for Climb: {climb_power / FT_LBS_PER_S_PER_HP} hp")
 		v_max_power = self.get_power_required_v_max()
-		print(f"Power Required for VMax: {v_max_power / FT_LBS_PER_S_PER_HP} hp")
 
 		max_power = np.max([takeoff_power, climb_power, v_max_power])
-		print(f"Maximum of Power Req: {max_power / FT_LBS_PER_S_PER_HP} hp")
-		print(f"AR: {AR}")
+		print(f"\n\tMaximum of Power Req: {max_power / FT_LBS_PER_S_PER_HP} hp")
 		return max_power, AR
 
 	def get_power_required_v_max(self):
@@ -138,6 +140,9 @@ class Aircraft:
 		T = W_mc * (0.5 * AIR_DENSITY_CRUISE * self.flight.v_max ** 2 * self.airfoil.Cdo / (
 					W_mc / self.S) + 2 * K * W_mc / (AIR_DENSITY_CRUISE * self.flight.v_max ** 2 * self.S))
 		P = T * self.flight.v_max / self.prop_efficiency
+		print("\tVMax:")
+		print(f"\t\tPower Required for VMax: {P / FT_LBS_PER_S_PER_HP} hp")
+
 		return P
 
 	def get_power_required_climb_and_AR(self):
@@ -145,6 +150,10 @@ class Aircraft:
 		AR = 1 / (np.pi * self.airfoil.e * K)
 		P = self.weight / self.prop_efficiency * (self.flight.rc_max + np.sqrt(2 / AIR_DENSITY_GROUND * np.sqrt(
 			K / (3 * self.airfoil.Cdo)) * self.wing_loading_max) * 1.155 / self.LD_ratio)
+		print("\tClimb:")
+		print(f"\t\tAR: {AR}")
+		print(f"\t\tPower Required for Climb: {P / FT_LBS_PER_S_PER_HP} hp")
+
 		return AR, P
 
 	def get_power_required_takeoff(self):
@@ -153,11 +162,8 @@ class Aircraft:
 		take_off_angle = np.arccos(1 - (self.flight.obstacle_height / R))  # Eq 6.99
 		s_a_profile = R * np.sin(take_off_angle)  # Eq 8.35
 		s_a_climb = v_stall_takeoff * (self.flight.obstacle_height / self.flight.rc_max)
-		print(f"s_a_profile: {s_a_profile}")
-		print(f"s_a_climb: {s_a_climb}")
 		s_a = np.max([s_a_profile, s_a_climb])
-		print(f"R:{R}")
-		print(f"angle:{take_off_angle * 180 / np.pi}")
+
 
 		# TWR_at_seventy_percent_LO = s_g_times_TWR/(self.flight.takeoff_distance-s_a) # Eq 8.36
 		s_g = self.flight.takeoff_distance - s_a
@@ -174,28 +180,44 @@ class Aircraft:
 
 		minimum_P = P_required / self.prop_efficiency  # Eq 8.38
 
+		print("\tTakeoff:")
+		print(f"\t\ts_a_profile: {s_a_profile}")
+		print(f"\t\ts_a_climb: {s_a_climb}")
+		print(f"\t\tR:{R}")
+		print(f"\t\tangle:{take_off_angle * 180 / np.pi}")
+		print(f"\t\tPower Required for Takeoff: {minimum_P / FT_LBS_PER_S_PER_HP} hp")
+
 		return minimum_P
 
 	# Sec 8.6.2 justification in the report
 	def select_wing_location(self):
 		# I already wrote the call and print bit in init before I realized there is no math
 		wing_location = "mid-wing"
-		print(f"wing location: {wing_location}")
+		print(f"\nwing location: {wing_location}")
 
-	def determine_wing_geometry(self, S, AR, taper_ratio):
+	def determine_wing_geometry(self, S, AR, taper_ratio, is_vert_tail, name):
 		b = np.sqrt(S * AR)
 		cr = 2 * S / ((taper_ratio + 1) * b)  # root chord length
 		ct = taper_ratio * cr  # tip chord length
 
-		y_bar = (b / 6) * ((1 + 2 * taper_ratio) / (1 + taper_ratio))
+		if is_vert_tail:
+			y_bar = (2 * b / 6) * ((1 + 2 * taper_ratio) / (1 + taper_ratio))
+		else:
+			y_bar = (b / 6) * ((1 + 2 * taper_ratio) / (1 + taper_ratio))
+
 		c_bar = (2 / 3) * cr * ((1 + taper_ratio + taper_ratio ** 2) / (1 + taper_ratio))
 
-		print("\nSingle wing geometry")
-		print(f"semi-span: {b / 2}")
-		print(f"root chord: {cr}")
-		print(f"tip chord: {ct}")
-		print(f"y bar: {y_bar}")
-		print(f"c bar: {c_bar}")
+		print(f"\nGeometry {name}")
+		print(f"\troot chord: {cr}")
+		print(f"\ttip chord: {ct}")
+		print(f"\tc bar: {c_bar}")
+
+		if is_vert_tail:
+			print(f"\tspan: {b}")
+			print(f"\tz bar: {y_bar}")
+		else:
+			print(f"\tsemi-span: {b / 2}")
+			print(f"\ty bar: {y_bar}")
 
 		return b, cr, ct, y_bar, c_bar
 
@@ -233,33 +255,29 @@ class Aircraft:
 		taper_front = fuel_tank_back
 		taper_back = taper_front + taper_length
 		locations = [0, engine_back, seats_back, fuel_tank_back, taper_back]
-		print("locations describe front/back of: engine, seats, fuel_tank, taper")
-		print(f"locations: {locations}")
-		print(f"cog without wing included: {cog_no_wing} ft")
-		print(f"cog with wing included: {overall_cog} ft")
+		print("\nLayout:")
+		print("\tlocations describe front/back of: engine, seats, fuel_tank, taper")
+		print(f"\tlocations: {locations}")
+		print(f"\tWing geometric center: {wing_center_geo}")
+		print(f"\tcog without wing included: {cog_no_wing} ft")
+		print(f"\tcog with wing included: {overall_cog} ft")
 		return overall_cog, locations
 
 	# Section 8.6.5
 	def calculate_tail(self):
 		v_ht = 0.7  # from literature
 		v_vt = 0.04  # from literature
+
 		l_ht_from_tip = self.body_lengths[4] - 1  # ft, chosen arbitrarily, but generally near total fuselage length
+		l_vt_from_tip = self.body_lengths[4] - 2
 
 		S_ht = v_ht * self.c_bar * self.S / (l_ht_from_tip - self.cog_wing)
+		S_vt = v_vt * self.b * self.S / (l_vt_from_tip - self.cog_wing)
 
-		l_vt = (l_ht_from_tip - self.cog_wing) - 1  # arbitrarily, they used 1.13, I rounded
-		S_vt = v_vt * self.b * self.S / l_vt
+		print(f"\nTail areas: {S_ht} ft^2 (horizontal), {S_vt} ft^2 (vertical)")
 
-		print(f"Tail areas: {S_ht} ft^2 (horizontal), {S_vt} ft^2 (vertical)")
-
-		b_ht, cr_ht, ct_ht, y_bar_ht, c_bar_ht = self.determine_wing_geometry(S_ht, 4, 0.5)  # arbitrary AR and taper
-		b_vt, cr_vt, ct_vt, z_bar_vt_by_two, c_bar_vt = self.determine_wing_geometry(S_vt, 1.5,
-																					 0.5)  # arbitrary AR and taper
-		z_bar_vt = 2 * z_bar_vt_by_two
-
-		print("\nTail dimension (span, root, tip)")
-		print(f"Horizontal: {b_ht}, {cr_ht}, {ct_ht}")
-		print(f"Vertical: {b_vt}, {cr_vt}, {ct_vt}")
+		self.determine_wing_geometry(S_ht, 4, 0.5, False, f"Horizontal ({l_ht_from_tip} ft back)" )  # arbitrary AR and taper
+		self.determine_wing_geometry(S_vt, 1.5,0.5, True, f"Vertical ({l_vt_from_tip} ft back)")  # arbitrary AR and taper
 
 		return S_ht, S_vt
 
@@ -269,7 +287,7 @@ class Aircraft:
 		V_tip_0 = np.pi * (self.engine.rpm / 60) * D
 		V_tip = np.sqrt(V_tip_0 ** 2 + self.flight.v_max ** 2)
 
-		print(f"Propeller: {D} ft, {V_tip_0} ft/s at tip, {V_tip} ft/s relative")
+		print(f"\nPropeller: {D} ft, {V_tip_0} ft/s at tip, {V_tip} ft/s relative")
 		return D
 
 	# Sec 8.6.7
@@ -280,8 +298,7 @@ class Aircraft:
 		x_ac_wing = x_n - Vht
 		x_geometric_center = x_ac_wing - (0.25 * self.c_bar)
 		x_leading = x_geometric_center + 0.5 * self.cr
-		print(f"Tried to place landing gear {x_geometric_center} ft back from nose to be on wing")
-		print(f"Entire wing is forward of cog, using bicycle arrangement instead")
+
 
 		A_d = 1.51
 		B_d = 0.349
@@ -301,11 +318,12 @@ class Aircraft:
 		wheel_N_width = A_w * F_N ** B_w
 		wheel_M_diameter = A_d * F_M ** B_d
 		wheel_M_width = A_w * F_M ** B_w
-
-		print(f"Wheel_N: {wheel_N_diameter} in diameter, {wheel_N_width} in width")
-		print(f"Wheel_M: {wheel_M_diameter} in diameter, {wheel_M_width} in width")
-		print(
-			f"Bicycle wheel requires two extra little wheels for roll stability, these have been ignored in terms of load bearing")
+		print("\nLanding Gear")
+		print(f"\tTried to place landing gear {x_geometric_center} ft back from nose to be on wing")
+		print(f"\tEntire wing is forward of cog, using bicycle arrangement instead")
+		print(f"\tWheel_N: {wheel_N_diameter} in diameter, {wheel_N_width} in width")
+		print(f"\tWheel_M: {wheel_M_diameter} in diameter, {wheel_M_width} in width")
+		print(f"\tBicycle wheel requires two extra little wheels for roll stability, not calculated")
 
 	# Sec 8.7
 	def updated_weight_estimate(self):
@@ -332,35 +350,37 @@ class Aircraft:
 			weight_last_time = self.weight
 			self.weight = weight
 			self.fuel_weight_est = self.fuel_fraction * self.weight
-		print(f"Updated weight: {self.weight} lbs")
-		print(f"Updated weight changed by: {self.weight - self.initial_weight_estimation}")
+		print("\nImproved Weight")
+		print(f"\tUpdated weight: {self.weight} lbs")
+		print(f"\tUpdated weight changed by: {self.weight - self.initial_weight_estimation}")
 
 	def other_configuration_stuff(self):
-		print("5 degree dihedral from previous designs")
-		print("make the control surfaces 30% of local chord")
-		print("hatch located next to seats")
-		print("make the airlerons 50% of the wing length")
+		print("\n General Configuration w/o Calcs")
+		print("\t5 degree dihedral from previous designs")
+		print("\tmake the control surfaces 30% of local chord")
+		print("\thatch located next to seats")
+		print("\tmake the airlerons 50% of the wing length")
 
 	# Sec 8.8 
 	def updated_performance(self):
 		wing_loading = self.weight / self.S
 		power_loading = self.weight / self.engine.nominal_power
 
-		print("\n\nFinal Evaluation of Perfomance")
+		print("\nFinal Evaluation of Perfomance")
 
-		print("\nKey Performance numbers")
-		print(f"Wing Loading {wing_loading} lb/ft^2")
-		print(f"Power Loading {power_loading} lb/hp")
+		print("\tKey Performance numbers")
+		print(f"\t\tWing Loading {wing_loading} lb/ft^2")
+		print(f"\t\tPower Loading {power_loading} lb/hp")
 
 		K = 1 / (4 * self.airfoil.Cdo * self.LD_ratio ** 2)
-		print("\nKey Aero Parameters")
-		print(f"Cdo {self.airfoil.Cdo}")
-		print(f"K {K}")
-		print(f"Cl_max {self.airfoil.max_cL}")
-		print(f"Cl_max_flaps {self.airfoil.max_cL_full_flaps}")
+		print("\tKey Aero Parameters")
+		print(f"\t\tCdo {self.airfoil.Cdo}")
+		print(f"\t\tK {K}")
+		print(f"\t\tCl_max {self.airfoil.max_cL}")
+		print(f"\t\tCl_max_flaps {self.airfoil.max_cL_full_flaps}")
 
 		# Sec 8.8.1 Power Required for Vmax
-		print("\nOther Parameters")
+		print("\tOther Parameters")
 
 		# solve nightmare shit Eq 5.12 on Pg 220
 		e = 2 * K * self.S / AIR_DENSITY_CRUISE * (self.weight / self.S) ** 2
@@ -370,18 +390,18 @@ class Aircraft:
 		a = 0.5 * AIR_DENSITY_CRUISE * self.airfoil.Cdo * self.S
 
 		v_max = np.polynomial.polynomial.polyroots([e, d, c, b, a])
-		print(f"V_max: {np.real(v_max[3] / FEET_PER_MILE * SECONDS_PER_HOUR)}")
+		print(f"\t\tV_max: {np.real(v_max[3] / FEET_PER_MILE * SECONDS_PER_HOUR)}")
 
 		# Sec 8.8.2 Rate of Climb
 		rc_max = ((self.prop_efficiency * self.engine.nominal_power * FT_LBS_PER_S_PER_HP) / self.weight) - (
 					(2 / AIR_DENSITY_CRUISE) * np.sqrt(K / (3 * self.airfoil.Cdo)) * (wing_loading)) ** (0.5) * (
 							 1.155 / (self.LD_ratio))
-		print(f"Max rate of climb: {rc_max}")
+		print(f"\t\tMax rate of climb: {rc_max}")
 
-		print(f"Range: is already guaranteed, this is the main thing driving the weight")
+		print(f"\t\tRange: is already guaranteed, this is the main thing driving the weight")
 
 		stalling_speed = np.sqrt(2 / AIR_DENSITY_CRUISE * wing_loading / self.airfoil.max_cL)
-		print(f"Stall speed: {stalling_speed / FEET_PER_MILE * SECONDS_PER_HOUR}")
+		print(f"\t\tStall speed: {stalling_speed / FEET_PER_MILE * SECONDS_PER_HOUR}")
 
 		R = (1.23 * stalling_speed) ** 2 / (0.2 * GRAVITY)
 		theta = 3
@@ -398,7 +418,7 @@ class Aircraft:
 
 		total_landing_distance = s_f + s_g
 
-		print(f"Landing distance: {total_landing_distance}")
+		print(f"\t\tLanding distance: {total_landing_distance}")
 		v_stall_takeoff = np.sqrt(2 * wing_loading / (AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps))
 
 		s_a_to = v_stall_takeoff * (self.flight.obstacle_height / self.flight.rc_max)
@@ -408,7 +428,7 @@ class Aircraft:
 		s_g_to = 1.21 * self.weight / self.S / (
 					GRAVITY * AIR_DENSITY_GROUND * self.airfoil.max_cL_half_flaps * (T / self.weight))
 		takeoff_distance = s_g_to + s_a_to
-		print(f"Takeoff distance: {takeoff_distance}")
+		print(f"\t\tTakeoff distance: {takeoff_distance}")
 
 	# calculating how much fuel *could* be stored in the wings, to assess viability
 	def fuel_in_wings(self):
@@ -428,12 +448,13 @@ class Aircraft:
 				average_bottom = (geo[chord_index + 1, 2] + geo[chord_index, 2]) / 2 * c
 				slice_height = average_top - average_bottom
 				volume = volume + slice_height * slice_width * d_span
-		print(f"\nfuel storeable in wings: {volume} ft^3 or {volume / self.fuel_vol_est}")
+		print("\nWing Fuel:")
+		print(f"\tfuel storeable in wings: {volume} ft^3 or {volume / self.fuel_vol_est}")
 
 		if volume / self.fuel_vol_est < 0.25:
-			print("no fuel in wings, this isn't significant")
+			print("\tno fuel in wings, this isn't significant")
 		else:
-			print("consider moving fuel to wings")
+			print("\tconsider moving fuel to wings")
 
 		return volume
 
@@ -453,7 +474,8 @@ class Airfoil:
 		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
 
 		self.e = 0.6  # TODO: I don't think this is right
-		self.Cdo = 4 * 0.0043  # TODO: I don't think this is right
+		self.Cdo = 4 * 0.0043  # TODO: I don't think this is rightlocations describe front/back of: engine, seats, fuel_tank, taper
+
 
 	def get_max_cl(self):
 		max_cl = 0
@@ -484,7 +506,8 @@ class Flight:
 		self.v_max = 200 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_stall = 180 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_flare = self.v_stall * 1.23
-		self.landing_distance = 5280 * 3  # ft, assuming a ~3 mile runway is about the max practical (assuming access to a military base)
+		# assuming a ~3 mile runway is about the max practical (assuming access to a military base)
+		self.landing_distance = 5280 * 3  # ft
 		self.takeoff_distance = 5280 * 3  # ft
 		self.obstacle_height = 10  # ft
 		self.rc_max = 2  # ft/s
@@ -494,8 +517,8 @@ class Engine:
 	def __init__(self, filename):
 		with open(filename) as f:
 			data = json.load(f)
-		self.nominal_power = data[
-			'power']  # we are going to use nominal power, because we can just fly at 18000 feet so turbocharging doesn't matter
+		# we are going to use nominal power, because we can just fly at 18000 feet so turbocharging doesn't matter
+		self.nominal_power = data['power']
 		self.turbocharged_to = data['turbocharged_to']
 		self.weight = 1.4 * data['nominal_weight']  # 1.4 is estimate from raynor for installed weight
 		self.dimensions = [data['length'], data['width'], data['height']]
