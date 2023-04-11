@@ -52,7 +52,7 @@ class Aircraft:
 		self.P, self.AR = self.determine_TWR_AR()
 
 		self.b, self.cr, self.ct, self.y_bar, self.c_bar = self.determine_wing_geometry(self.S, self.AR,
-																						self.taper_ratio, True, "Main Wing")
+																						self.taper_ratio, False, "Main Wing")
 
 		self.select_wing_location()
 
@@ -258,7 +258,7 @@ class Aircraft:
 		print("\nLayout:")
 		print("\tlocations describe front/back of: engine, seats, fuel_tank, taper")
 		print(f"\tlocations: {locations}")
-		print(f"\tWing geometric center: {wing_center_geo}")
+		print(f"\tWing geometric center first estimate: {wing_center_geo}")
 		print(f"\tcog without wing included: {cog_no_wing} ft")
 		print(f"\tcog with wing included: {overall_cog} ft")
 		return overall_cog, locations
@@ -277,7 +277,7 @@ class Aircraft:
 		print(f"\nTail areas: {S_ht} ft^2 (horizontal), {S_vt} ft^2 (vertical)")
 
 		self.determine_wing_geometry(S_ht, 4, 0.5, False, f"Horizontal ({l_ht_from_tip} ft back)" )  # arbitrary AR and taper
-		self.determine_wing_geometry(S_vt, 1.5,0.5, True, f"Vertical ({l_vt_from_tip} ft back)")  # arbitrary AR and taper
+		self.determine_wing_geometry(S_vt, 4, 0.5, True, f"Vertical ({l_vt_from_tip} ft back)")  # arbitrary AR and taper
 
 		return S_ht, S_vt
 
@@ -321,9 +321,10 @@ class Aircraft:
 		print("\nLanding Gear")
 		print(f"\tTried to place landing gear {x_geometric_center} ft back from nose to be on wing")
 		print(f"\tEntire wing is forward of cog, using bicycle arrangement instead")
-		print(f"\tWheel_N: {wheel_N_diameter} in diameter, {wheel_N_width} in width")
-		print(f"\tWheel_M: {wheel_M_diameter} in diameter, {wheel_M_width} in width")
+		print(f"\tWheel_N: {wheel_N_diameter} in diameter, {wheel_N_width} in width, {nose_wheel_placement} ft back")
+		print(f"\tWheel_M: {wheel_M_diameter} in diameter, {wheel_M_width} in width, {main_wheel_placement+self.cog_wing} ft back")
 		print(f"\tBicycle wheel requires two extra little wheels for roll stability, not calculated")
+		print(f"\tFinal Wing Location: {x_geometric_center} ft from nose")
 
 	# Sec 8.7
 	def updated_weight_estimate(self):
