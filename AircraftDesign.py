@@ -141,6 +141,7 @@ class Aircraft:
 					W_mc / self.S) + 2 * K * W_mc / (AIR_DENSITY_CRUISE * self.flight.v_max ** 2 * self.S))
 		P = T * self.flight.v_max / self.prop_efficiency
 		print("\tVMax:")
+		print(f"\t\tMidcruise Weight: {W_mc} lbs")
 		print(f"\t\tPower Required for VMax: {P / FT_LBS_PER_S_PER_HP} hp")
 
 		return P
@@ -337,12 +338,13 @@ class Aircraft:
 		main_fuselage_length = self.body_lengths[3] - self.body_lengths[1]
 		final_taper_length = self.body_lengths[4] - self.body_lengths[3]
 		weight_last_time = 0
+		Area_nose = np.pi * self.fuselage_diam * np.sqrt(engine_bay_length ** 2 + self.fuselage_diam ** 2)
+		Area_body = self.fuselage_diam ** 2 * main_fuselage_length
+		Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length ** 2 + self.fuselage_diam ** 2)
+		S_wet = Area_nose + Area_body + Area_taper
+		fuselage_weight = S_wet * 1.4
+		
 		while (np.abs(self.weight - weight_last_time) / self.weight > 0.000001):
-			Area_nose = np.pi * self.fuselage_diam * np.sqrt(engine_bay_length ** 2 + self.fuselage_diam ** 2)
-			Area_body = self.fuselage_diam ** 2 * main_fuselage_length
-			Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length ** 2 + self.fuselage_diam ** 2)
-			S_wet = Area_nose + Area_body + Area_taper
-			fuselage_weight = S_wet * 1.4
 
 			weight = (
 								 self.fuel_weight_est + self.flight.weight_stuff + wing_weight + horiz_tail_weight + vert_tail_weight + fuselage_weight + self.engine.weight) / (
@@ -487,8 +489,19 @@ class Airfoil:
 		return max_cl
 
 	def plot_airfoil(self):
-		plt.scatter(self.airfoil_geometry[:, 0], self.airfoil_geometry[:, 1])
-		plt.scatter(self.airfoil_geometry[:, 0], self.airfoil_geometry[:, 2])
+		plt.figure()
+		plt.plot(self.airfoil_geometry[:, 0], self.airfoil_geometry[:, 1], label='Top Surface')
+		plt.plot(self.airfoil_geometry[:, 0], self.airfoil_geometry[:, 2], label='Bottom Surface')
+		plt.plot(self.airfoil_geometry[:, 0], (self.airfoil_geometry[:, 1] + self.airfoil_geometry[:, 2])/2, label='Camber Line')
+		plt.axis('equal')
+		plt.legend()
+
+		plt.figure()
+		plt.title('Cl vs Alpha for RONCZ 1046 VOYAGER')
+		plt.xlabel('Alpha (degrees)')
+		plt.ylabel('Cl (dimensionless)')
+		plt.plot(self.airfoil_performance[:,0], self.airfoil_performance[:,1])
+
 		plt.show()
 
 
