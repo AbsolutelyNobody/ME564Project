@@ -343,7 +343,7 @@ class Aircraft:
 		Area_taper = np.pi * self.fuselage_diam * np.sqrt(final_taper_length ** 2 + self.fuselage_diam ** 2)
 		S_wet = Area_nose + Area_body + Area_taper
 		fuselage_weight = S_wet * 1.4
-		
+
 		while (np.abs(self.weight - weight_last_time) / self.weight > 0.000001):
 
 			weight = (
