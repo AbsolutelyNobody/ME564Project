@@ -313,7 +313,7 @@ class Aircraft:
 		x_2 = main_wheel_placement
 		x_3 = x_1 + x_2
 
-		F_M = self.weight * x_1 / x_3  # best of luck
+		F_M = self.weight * x_1 / x_3
 		F_N = self.weight * x_2 / x_3
 		wheel_N_diameter = A_d * F_N ** B_d
 		wheel_N_width = A_w * F_N ** B_w
@@ -385,7 +385,7 @@ class Aircraft:
 		# Sec 8.8.1 Power Required for Vmax
 		print("\tOther Parameters")
 
-		# solve nightmare shit Eq 5.12 on Pg 220
+		# solve Eq 5.12 on Pg 220
 		e = 2 * K * self.S / AIR_DENSITY_CRUISE * (self.weight / self.S) ** 2
 		d = -self.engine.nominal_power * FT_LBS_PER_S_PER_HP
 		c = 0
@@ -469,15 +469,15 @@ class Airfoil:
 		self.airfoil_geometry = np.genfromtxt(geometry_file, delimiter=',')
 		self.max_cl = self.get_max_cl()
 		self.max_cL = self.max_cl * 0.9
-		# using only l/L to distinguish seems bad, but they do it
-		self.max_cl_full_flaps = 0.9 + self.max_cl  # idk why tf this is, but -\_o_/-
+
+		self.max_cl_full_flaps = 0.9 + self.max_cl  # this approximation seems bad, but -\_o_/-
 		self.max_cL_full_flaps = 0.9 * self.max_cl_full_flaps  # Eq 8.24
 
 		self.max_cl_half_flaps = 0.5 + self.max_cl
 		self.max_cL_half_flaps = 0.9 * self.max_cl_half_flaps
 
-		self.e = 0.6  # TODO: I don't think this is right
-		self.Cdo = 4 * 0.0043  # TODO: I don't think this is rightlocations describe front/back of: engine, seats, fuel_tank, taper
+		self.e = 0.6 # from literature
+		self.Cdo = 4 * 0.0043 # from literature
 
 
 	def get_max_cl(self):
@@ -505,7 +505,7 @@ class Airfoil:
 		plt.show()
 
 
-# TODO: Load stuff from a file
+
 class Flight:
 	# Non-technical constants
 	CREW_MEMBER_WEIGHT = 70  # kg
@@ -520,7 +520,7 @@ class Flight:
 		self.v_max = 200 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_stall = 180 * KM_TO_MILES * FEET_PER_MILE / SECONDS_PER_HOUR
 		self.v_flare = self.v_stall * 1.23
-		# assuming a ~3 mile runway is about the max practical (assuming access to a military base)
+		# assuming a ~3 mile runway is about the max practical (assuming access to a military base like Edwards AFB)
 		self.landing_distance = 5280 * 3  # ft
 		self.takeoff_distance = 5280 * 3  # ft
 		self.obstacle_height = 10  # ft
